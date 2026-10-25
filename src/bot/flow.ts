@@ -8,7 +8,6 @@ import {
 	type ButtonInteraction,
 	type ChatInputCommandInteraction,
 	type Interaction,
-	type Message,
 	type ModalSubmitInteraction,
 } from 'discord.js';
 import {
@@ -249,10 +248,6 @@ async function startRun(interaction: ButtonInteraction, questId: string | null):
 	activeRuns.set(interaction.user.id, { controller });
 	pendingSetups.delete(interaction.user.id);
 
-	await interaction.deferUpdate();
-	// The picker has served its purpose; removing its components also prevents
-	// the same buttons being pressed again while this run is active.
-	await interaction.editReply({ components: [] }).catch(() => undefined);
 	await runBatch(interaction, setup.client, queue, controller);
 }
 
@@ -276,19 +271,16 @@ async function runBatch(
 		percent: firstTask?.percent ?? 0,
 	};
 
-	let progressMessage: Message | undefined;
 	let refresh: ThrottledEditor | undefined;
 
-	try {
-		// Interaction tokens expire after ~15 minutes, which is shorter than a
-		// full batch of game quests. A follow-up is a normal channel message, so
-		// the bot token can keep editing it for as long as the run takes.
-		progressMessage = await interaction.followUp({
-			embeds: [progressEmbed(snapshot)],
-			components: [stopRow()],
-		});
+	// The quest browser becomes the progress message in place, so a run never
+	// adds a second embed to the channel. Later edits go through the message
+	// object, whose bot token does not expire like the interaction token does.
+	const message = interaction.message;
 
-		const message = progressMessage;
+	try {
+		await interaction.update({ embeds: [progressEmbed(snapshot)], components: [stopRow()] });
+
 		refresh = new ThrottledEditor(
 			() => message.edit({ embeds: [progressEmbed(snapshot)], components: [stopRow()] }),
 			PROGRESS_EDIT_INTERVAL_MS,
@@ -331,12 +323,7 @@ async function runBatch(
 	} catch (error) {
 		log('bot', `automation failed: ${describeError(error)}`);
 		await refresh?.dispose();
-		const embed = errorEmbed(describeError(error));
-		if (progressMessage) {
-			await progressMessage.edit({ embeds: [embed], components: [] }).catch(() => undefined);
-		} else {
-			await interaction.editReply({ embeds: [embed], components: [] }).catch(() => undefined);
-		}
+		await message.edit({ embeds: [errorEmbed(describeError(error))], components: [] }).catch(() => undefined);
 	} finally {
 		// Covers the error paths that never reached the explicit dispose above.
 		await refresh?.dispose();
