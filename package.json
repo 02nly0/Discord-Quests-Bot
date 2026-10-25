@@ -1,0 +1,21 @@
+{
+  "name": "discord-quests-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot that automatically completes your Discord quests.",
+  "type": "module",
+  "module": "src/index.ts",
+  "author": "DevonNetwork",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "discord.js": "^14.17.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}
