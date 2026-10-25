@@ -4,6 +4,7 @@ import type { Quest } from '../quest';
 export interface PendingSetup {
 	client: DiscordApiClient;
 	quests: Quest[];
+	index: number;
 }
 
 export interface ActiveRun {

@@ -15,12 +15,18 @@ export interface QuestConfigPayload {
 	application_id?: string;
 	application?: ApplicationPayload;
 	assets?: QuestAssetsPayload;
+	colors?: QuestColorsPayload;
 	messages?: QuestMessagesPayload;
 	rewards_config?: RewardsConfigPayload;
 	task_config?: TaskConfigPayload;
 	task_config_v2?: TaskConfigPayload;
 	starts_at?: string;
 	expires_at?: string;
+}
+
+export interface QuestColorsPayload {
+	primary?: string | number;
+	secondary?: string | number;
 }
 
 export interface ApplicationPayload {
@@ -47,6 +53,9 @@ export interface RewardsConfigPayload {
 
 export interface RewardPayload {
 	id?: string;
+	type?: number;
+	orb_quantity?: number;
+	premium_orb_quantity?: number;
 	messages?: { name?: string; name_plural?: string };
 }
 

@@ -27,5 +27,5 @@ export async function fetchQuests(client: DiscordApiClient): Promise<Quest[]> {
 
 /** Quests the automation can actually run, in Discord's own ordering. */
 export function automatableQuests(quests: Quest[]): Quest[] {
-	return quests.filter((quest) => !quest.isCompleted && quest.solvableTask !== null);
+	return quests.filter((quest) => quest.isAutomatable);
 }

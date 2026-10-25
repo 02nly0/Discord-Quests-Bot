@@ -3,7 +3,6 @@ import {
 	ButtonBuilder,
 	ButtonStyle,
 	ModalBuilder,
-	StringSelectMenuBuilder,
 	TextInputBuilder,
 	TextInputStyle,
 	type ButtonInteraction,
@@ -11,7 +10,6 @@ import {
 	type Interaction,
 	type Message,
 	type ModalSubmitInteraction,
-	type StringSelectMenuInteraction,
 } from 'discord.js';
 import {
 	automatableQuests,
@@ -22,12 +20,12 @@ import {
 	type Quest,
 } from '../quest';
 import { log } from '../util/logger';
-import { describeError, truncate } from '../util/format';
+import { describeError } from '../util/format';
 import { ThrottledEditor } from '../util/throttle';
 import {
 	invalidTokenEmbed,
 	progressEmbed,
-	questListEmbed,
+	questEmbed,
 	summaryEmbed,
 	errorEmbed,
 	type AutomationSnapshot,
@@ -40,7 +38,9 @@ const MODAL_ID = 'quests:token';
 const TOKEN_INPUT_ID = 'quests:token:input';
 const COMPLETE_ALL_ID = 'quests:complete-all';
 const STOP_ID = 'quests:stop';
-const SELECT_ID = 'quests:select';
+const PREV_ID = 'quests:prev';
+const NEXT_ID = 'quests:next';
+const CONFIRM_ID = 'quests:confirm';
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
 	try {
@@ -48,12 +48,16 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 			await showTokenModal(interaction);
 		} else if (interaction.isModalSubmit() && interaction.customId === MODAL_ID) {
 			await beginQuestSetup(interaction);
+		} else if (interaction.isButton() && interaction.customId === PREV_ID) {
+			await browseQuests(interaction, -1);
+		} else if (interaction.isButton() && interaction.customId === NEXT_ID) {
+			await browseQuests(interaction, 1);
+		} else if (interaction.isButton() && interaction.customId === CONFIRM_ID) {
+			await confirmQuest(interaction);
 		} else if (interaction.isButton() && interaction.customId === COMPLETE_ALL_ID) {
 			await startRun(interaction, null);
 		} else if (interaction.isButton() && interaction.customId === STOP_ID) {
 			await stopRun(interaction);
-		} else if (interaction.isStringSelectMenu() && interaction.customId === SELECT_ID) {
-			await startRun(interaction, interaction.values[0]);
 		}
 	} catch (error) {
 		log('bot', `interaction failed: ${describeError(error)}`);
@@ -97,44 +101,72 @@ async function beginQuestSetup(interaction: ModalSubmitInteraction): Promise<voi
 		return;
 	}
 
-	pendingSetups.set(interaction.user.id, { client, quests });
+	pendingSetups.set(interaction.user.id, { client, quests, index: 0 });
 	await interaction.editReply({
-		embeds: [questListEmbed(quests)],
-		components: selectionRows(quests),
+		embeds: [questEmbed(quests[0], 0, quests.length)],
+		components: questRows(quests, 0),
 	});
 }
 
-function selectionRows(quests: Quest[]): ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] {
-	const rows: ActionRowBuilder<StringSelectMenuBuilder | ButtonBuilder>[] = [];
-	const automatable = automatableQuests(quests);
+function questRows(quests: Quest[], index: number): ActionRowBuilder<ButtonBuilder>[] {
+	const quest = quests[index];
+	const canBrowse = quests.length > 1;
 
-	if (automatable.length > 1) {
-		const select = new StringSelectMenuBuilder()
-			.setCustomId(SELECT_ID)
-			.setPlaceholder('Pick a single quest to complete')
-			.addOptions(
-				automatable.slice(0, 25).map((quest) => ({
-					label: truncate(quest.displayName, 100),
-					description: truncate(`Reward: ${quest.rewardName}`, 100),
-					value: quest.id,
-				})),
-			);
-		rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select));
-	}
+	const back = new ButtonBuilder()
+		.setCustomId(PREV_ID)
+		.setLabel('Back')
+		.setStyle(ButtonStyle.Secondary)
+		.setDisabled(!canBrowse);
+
+	const confirm = new ButtonBuilder()
+		.setCustomId(CONFIRM_ID)
+		.setLabel('Confirm')
+		.setStyle(ButtonStyle.Success)
+		.setDisabled(!quest.isAutomatable);
+
+	const next = new ButtonBuilder()
+		.setCustomId(NEXT_ID)
+		.setLabel('Next')
+		.setStyle(ButtonStyle.Secondary)
+		.setDisabled(!canBrowse);
 
 	const completeAll = new ButtonBuilder()
 		.setCustomId(COMPLETE_ALL_ID)
-		.setLabel('Complete all')
-		.setStyle(ButtonStyle.Primary);
+		.setLabel('Complete all quests')
+		.setStyle(ButtonStyle.Secondary)
+		.setDisabled(automatableQuests(quests).length === 0);
 
-	rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(completeAll));
-	return rows;
+	return [
+		new ActionRowBuilder<ButtonBuilder>().addComponents(back, confirm, next),
+		new ActionRowBuilder<ButtonBuilder>().addComponents(completeAll),
+	];
 }
 
-async function startRun(
-	interaction: ButtonInteraction | StringSelectMenuInteraction,
-	questId: string | null,
-): Promise<void> {
+async function browseQuests(interaction: ButtonInteraction, step: number): Promise<void> {
+	const setup = pendingSetups.get(interaction.user.id);
+	if (!setup) {
+		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
+		return;
+	}
+
+	setup.index = (setup.index + step + setup.quests.length) % setup.quests.length;
+	await interaction.update({
+		embeds: [questEmbed(setup.quests[setup.index], setup.index, setup.quests.length)],
+		components: questRows(setup.quests, setup.index),
+	});
+}
+
+async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
+	const setup = pendingSetups.get(interaction.user.id);
+	if (!setup) {
+		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
+		return;
+	}
+
+	await startRun(interaction, setup.quests[setup.index].id);
+}
+
+async function startRun(interaction: ButtonInteraction, questId: string | null): Promise<void> {
 	const setup = pendingSetups.get(interaction.user.id);
 	if (!setup) {
 		await interaction.reply({ content: 'Run `/quests` first to load your quests.', ephemeral: true });
@@ -175,7 +207,7 @@ async function startRun(
 }
 
 async function runBatch(
-	interaction: ButtonInteraction | StringSelectMenuInteraction,
+	interaction: ButtonInteraction,
 	client: DiscordApiClient,
 	queue: Quest[],
 	controller: AbortController,

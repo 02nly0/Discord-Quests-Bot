@@ -64,6 +64,18 @@ describe('Quest status flags', () => {
 		expect(unparseable.expiresAt).toBeNull();
 		expect(unparseable.isExpired).toBe(false);
 	});
+
+	it('is automatable only while incomplete and supported', () => {
+		const fresh = new Quest(questPayload());
+		const completed = new Quest(questPayload({ userStatus: { completed_at: '2026-10-02T00:00:00.000Z' } }));
+		const unsupported = new Quest(
+			questPayload({ config: { task_config_v2: { tasks: { DO_THE_DISHES: { target: 5 } } } } }),
+		);
+
+		expect(fresh.isAutomatable).toBe(true);
+		expect(completed.isAutomatable).toBe(false);
+		expect(unsupported.isAutomatable).toBe(false);
+	});
 });
 
 describe('Quest.tileUrl', () => {
@@ -79,6 +91,68 @@ describe('Quest.tileUrl', () => {
 
 	it('returns null when there are no assets', () => {
 		expect(new Quest(questPayload()).tileUrl).toBeNull();
+	});
+
+	it('resolves hero and logotype assets the same way', () => {
+		const quest = new Quest(questPayload({ config: { assets: { hero: 'hero.png', logotype: 'quests/abc/logo.png' } } }));
+		expect(quest.heroUrl).toBe('https://cdn.discordapp.com/quests/q1/hero.png');
+		expect(quest.logotypeUrl).toBe('https://cdn.discordapp.com/quests/abc/logo.png');
+	});
+});
+
+describe('Quest rewards', () => {
+	it('reads the orb payout and its Nitro figure', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					rewards_config: {
+						rewards: [{ type: 4, orb_quantity: 1000, premium_orb_quantity: 1200, messages: { name: '1,000 Orbs' } }],
+					},
+				},
+			}),
+		);
+
+		expect(quest.rewardName).toBe('1,000 Orbs');
+		expect(quest.rewards[0]).toEqual({ name: '1,000 Orbs', type: 4, orbs: 1000, premiumOrbs: 1200 });
+	});
+
+	it('falls back to the base payout when Discord sends no Nitro figure', () => {
+		const quest = new Quest(questPayload({ config: { rewards_config: { rewards: [{ type: 4, orb_quantity: 500 }] } } }));
+		expect(quest.rewards[0]).toEqual({ name: 'Unknown reward', type: 4, orbs: 500, premiumOrbs: 500 });
+	});
+
+	it('keeps rewards that pay no orbs', () => {
+		const quest = new Quest(
+			questPayload({
+				config: { rewards_config: { rewards: [{ type: 3, messages: { name: 'Avatar Decoration' } }] } },
+			}),
+		);
+		expect(quest.rewards[0]).toEqual({ name: 'Avatar Decoration', type: 3, orbs: 0, premiumOrbs: 0 });
+	});
+});
+
+describe('Quest.brandColor', () => {
+	it('reads the hex color Discord sends in the quest config', () => {
+		const quest = new Quest(questPayload({ config: { colors: { primary: '#E944D4' } } }));
+		expect(quest.brandColor).toBe(0xe944d4);
+	});
+
+	it('accepts a hex color without the leading hash', () => {
+		const quest = new Quest(questPayload({ config: { colors: { primary: '5318A7' } } }));
+		expect(quest.brandColor).toBe(0x5318a7);
+	});
+
+	it('still accepts a numeric color', () => {
+		const quest = new Quest(questPayload({ config: { colors: { primary: 0x5865f2 } } }));
+		expect(quest.brandColor).toBe(0x5865f2);
+	});
+
+	it('ignores missing, zero, and out-of-range colors', () => {
+		expect(new Quest(questPayload()).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: 0 } } })).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: 0x1000000 } } })).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: '#000000' } } })).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: 'blurple' } } })).brandColor).toBeNull();
 	});
 });
 

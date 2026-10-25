@@ -10,26 +10,78 @@ export const COLORS = {
 	danger: 0xed4245,
 } as const;
 
-export function questListEmbed(quests: Quest[]): EmbedBuilder {
-	const automatable = quests.filter((quest) => quest.solvableTask !== null);
+const REWARD_TYPES: Partial<Record<number, string>> = {
+	1: 'Redeemable code',
+	2: 'In-game item',
+	3: 'Collectible',
+	4: 'Orbs',
+	5: 'Nitro trial',
+};
 
+const IMAGE_ASSET = /\.(png|jpe?g|webp|gif)(\?|$)/i;
+
+function formatCount(value: number): string {
+	return value.toLocaleString('en-US');
+}
+
+function rewardValue(quest: Quest): string {
+	if (quest.rewards.length === 0) return 'Unknown reward';
+
+	const lines = quest.rewards.map((reward) => {
+		if (reward.orbs > 0) {
+			return reward.premiumOrbs > reward.orbs
+				? `${formatCount(reward.orbs)} Orbs (${formatCount(reward.premiumOrbs)} with Nitro)`
+				: `${formatCount(reward.orbs)} Orbs`;
+		}
+
+		const label = REWARD_TYPES[reward.type ?? 0];
+		if (reward.name === 'Unknown reward') return label ?? 'Unknown reward';
+		return label && !reward.name.toLowerCase().includes(label.toLowerCase()) ? `${reward.name} (${label})` : reward.name;
+	});
+
+	return truncate(lines.join('\n'), 1024);
+}
+
+export function questEmbed(quest: Quest, index: number, total: number): EmbedBuilder {
+	const task = quest.solvableTask;
 	const embed = new EmbedBuilder()
-		.setColor(COLORS.primary)
-		.setTitle('Your Discord Quests')
-		.setDescription(
-			`${automatable.length} of ${quests.length} active quests can be completed automatically. ` +
-				'Choose a quest below, or run them all.',
-		);
+		.setColor(quest.brandColor ?? COLORS.primary)
+		.setAuthor({ name: truncate(quest.gameName || quest.applicationName || 'Discord Quest', 256) })
+		.setTitle(truncate(quest.questName, 256))
+		.setFooter({ text: `Quest ${index + 1} of ${total}` });
 
-	for (const quest of quests.slice(0, 10)) {
+	if (quest.isCompleted) {
+		embed.setDescription('Completed. Claim your reward in the Discord client.');
+	} else if (!task) {
+		embed.setDescription('This quest cannot be completed automatically.');
+	}
+
+	const thumbnail = quest.tileUrl ?? quest.logotypeUrl;
+	if (thumbnail) embed.setThumbnail(thumbnail);
+
+	const hero = quest.heroUrl;
+	if (hero && IMAGE_ASSET.test(hero)) embed.setImage(hero);
+
+	embed.addFields({ name: 'Reward', value: rewardValue(quest), inline: true });
+
+	const expiresAt = quest.expiresAt;
+	if (expiresAt) {
 		embed.addFields({
-			name: truncate(quest.displayName, 256),
-			value: quest.formatProgress(),
+			name: 'Ends',
+			value: `<t:${Math.floor(expiresAt.getTime() / 1000)}:R>`,
+			inline: true,
 		});
 	}
 
-	if (quests.length > 10) {
-		embed.setFooter({ text: `Showing 10 of ${quests.length}. Use the menu to pick one.` });
+	if (quest.isCompleted) {
+		embed.addFields({ name: 'Progress', value: `${progressBar(100)} 100%` });
+	} else if (!task) {
+		embed.addFields({ name: 'Progress', value: 'Not supported by the bot' });
+	} else {
+		embed.addFields({
+			name: 'Progress',
+			value: `${progressBar(task.percent)} ${task.percent}%\n${formatDuration(task.current)} of ${formatDuration(task.target)}`,
+		});
 	}
 
 	return embed;

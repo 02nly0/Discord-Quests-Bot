@@ -12,6 +12,31 @@ export interface TaskSnapshot {
 	completed: boolean;
 }
 
+export interface QuestReward {
+	name: string;
+	type: number | null;
+	orbs: number;
+	premiumOrbs: number;
+}
+
+function positiveNumber(value: number | undefined): number {
+	return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function parseColor(value: string | number | undefined): number | null {
+	if (typeof value === 'number') {
+		return Number.isInteger(value) && value > 0 && value <= 0xffffff ? value : null;
+	}
+
+	if (typeof value !== 'string') return null;
+
+	const hex = value.startsWith('#') ? value.slice(1) : value;
+	if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+
+	const color = Number.parseInt(hex, 16);
+	return color > 0 ? color : null;
+}
+
 /**
  * Wraps a raw quest payload with the queries the automation needs:
  * which tasks are runnable, how far along they are, and where progress
@@ -37,7 +62,19 @@ export class Quest {
 	}
 
 	get rewardName(): string {
-		return this.payload.config.rewards_config?.rewards?.[0]?.messages?.name ?? 'Unknown reward';
+		return this.rewards[0]?.name ?? 'Unknown reward';
+	}
+
+	get rewards(): QuestReward[] {
+		return (this.payload.config.rewards_config?.rewards ?? []).map((reward) => {
+			const orbs = positiveNumber(reward.orb_quantity);
+			return {
+				name: reward.messages?.name ?? 'Unknown reward',
+				type: reward.type ?? null,
+				orbs,
+				premiumOrbs: positiveNumber(reward.premium_orb_quantity) || orbs,
+			};
+		});
 	}
 
 	get applicationId(): string | null {
@@ -48,8 +85,23 @@ export class Quest {
 		return this.payload.config.application?.name ?? null;
 	}
 
+	get brandColor(): number | null {
+		return parseColor(this.payload.config.colors?.primary);
+	}
+
 	get tileUrl(): string | null {
-		const path = this.payload.config.assets?.game_tile;
+		return this.assetUrl(this.payload.config.assets?.game_tile);
+	}
+
+	get heroUrl(): string | null {
+		return this.assetUrl(this.payload.config.assets?.hero);
+	}
+
+	get logotypeUrl(): string | null {
+		return this.assetUrl(this.payload.config.assets?.logotype);
+	}
+
+	private assetUrl(path: string | undefined): string | null {
 		if (!path) return null;
 		const base = 'https://cdn.discordapp.com';
 		return path.startsWith('quests/') ? `${base}/${path}` : `${base}/quests/${this.id}/${path}`;
@@ -73,6 +125,10 @@ export class Quest {
 
 	get isEnrolled(): boolean {
 		return Boolean(this.payload.user_status?.enrolled_at);
+	}
+
+	get isAutomatable(): boolean {
+		return !this.isCompleted && this.solvableTask !== null;
 	}
 
 	get tasks(): TaskSnapshot[] {
