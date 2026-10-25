@@ -5,6 +5,7 @@
 **Complete your Discord quests automatically - one click, every reward.**
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/DevonNetwork/Discord-Quests-Bot/actions/workflows/ci.yml/badge.svg)](https://github.com/DevonNetwork/Discord-Quests-Bot/actions/workflows/ci.yml)
 [![Runtime](https://img.shields.io/badge/runtime-Bun-f472b6?logo=bun&logoColor=white)](https://bun.sh)
 [![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Built with](https://img.shields.io/badge/built%20with-discord.js-5865f2?logo=discord&logoColor=white)](https://discord.js.org)
@@ -59,8 +60,11 @@ cp .env.example .env
 ```sh
 bun run dev        # development, with file watching
 bun run start      # production
-bun run typecheck  # strict type check
+bun run check      # typecheck + lint + tests
 ```
+
+The individual quality commands are `bun run typecheck`, `bun run lint`, and
+`bun test`.
 
 ## 🤖 Usage
 
@@ -85,8 +89,9 @@ flowchart LR
     C --> D{Quest type?}
     D -- video --> E["POST /quests/{id}/video-progress\nevery 5s"]
     D -- game --> F["POST /quests/{id}/heartbeat\nevery 30s"]
-    E --> G["100%\nterminal heartbeat"]
+    E --> G["100% complete"]
     F --> G
+    G --> H["terminal heartbeat\ngame quests only"]
 ```
 
 - **Video quests** (`WATCH_VIDEO`, `WATCH_VIDEO_ON_MOBILE`) report a timestamp that advances with the wall clock.
@@ -115,10 +120,13 @@ src/
 │   ├── quest.ts        quest model and progress queries
 │   ├── runner.ts       heartbeat / video-progress loop
 │   └── tasks.ts        supported task registry and pacing
+├── testing/        Shared test helpers (scripted API client)
 ├── util/           Small shared helpers
 ├── config.ts       environment configuration
 └── index.ts        entry point
 ```
+
+Unit tests sit next to the code as `*.test.ts` and run with `bun test`.
 
 ## ❓ FAQ
 
@@ -152,10 +160,10 @@ Contributions are welcome! Please open an issue to discuss bigger changes before
 
 ```sh
 bun install
-bun run typecheck
+bun run check   # typecheck + lint + tests
 ```
 
-Make sure the type check passes before you open your PR.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, code expectations, and test setup. Security issues should be reported privately as described in [SECURITY.md](SECURITY.md).
 
 ## ⚠️ Disclaimer
 
