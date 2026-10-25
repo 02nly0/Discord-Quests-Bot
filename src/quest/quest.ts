@@ -76,8 +76,7 @@ export class Quest {
 	}
 
 	get tasks(): TaskSnapshot[] {
-		const definitions =
-			this.payload.config.task_config_v2?.tasks ?? this.payload.config.task_config?.tasks ?? {};
+		const definitions = this.payload.config.task_config_v2?.tasks ?? this.payload.config.task_config?.tasks ?? {};
 		const progress = this.payload.user_status?.progress ?? {};
 
 		return Object.entries(definitions)
@@ -102,9 +101,7 @@ export class Quest {
 	 * quests already past their goal still resolve.
 	 */
 	get solvableTask(): TaskSnapshot | null {
-		const runnable = this.tasks
-			.filter((task) => task.supported && !task.completed)
-			.sort((a, b) => a.target - b.target);
+		const runnable = this.tasks.filter((task) => task.supported && !task.completed).sort((a, b) => a.target - b.target);
 		return runnable[0] ?? this.tasks.find((task) => task.supported) ?? null;
 	}
 

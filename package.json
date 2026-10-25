@@ -1,21 +1,48 @@
 {
-  "name": "discord-quests-bot",
-  "version": "1.0.0",
-  "description": "A Discord bot that automatically completes your Discord quests.",
-  "type": "module",
-  "module": "src/index.ts",
-  "author": "DevonNetwork",
-  "license": "Apache-2.0",
-  "scripts": {
-    "start": "bun run src/index.ts",
-    "dev": "bun --watch run src/index.ts",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "discord.js": "^14.17.0"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.7.0"
-  }
+	"name": "discord-quests-bot",
+	"version": "1.0.0",
+	"description": "A self-hosted Discord bot that automatically completes your Discord quests.",
+	"type": "module",
+	"module": "src/index.ts",
+	"author": "DevonNetwork",
+	"license": "Apache-2.0",
+	"homepage": "https://github.com/DevonNetwork/Discord-Quests-Bot#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/DevonNetwork/Discord-Quests-Bot.git"
+	},
+	"bugs": {
+		"url": "https://github.com/DevonNetwork/Discord-Quests-Bot/issues"
+	},
+	"keywords": [
+		"discord",
+		"discord-quests",
+		"quests",
+		"bot",
+		"automation",
+		"typescript",
+		"bun"
+	],
+	"engines": {
+		"bun": ">=1.1.0"
+	},
+	"scripts": {
+		"start": "bun run src/index.ts",
+		"dev": "bun --watch run src/index.ts",
+		"test": "bun test",
+		"test:watch": "bun test --watch",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"check": "bun run typecheck && bun run lint && bun test"
+	},
+	"dependencies": {
+		"discord.js": "^14.17.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.6.3",
+		"@types/bun": "^1.4.4",
+		"typescript": "^5.7.0"
+	}
 }
