@@ -58,9 +58,10 @@ cp .env.example .env
 ### Running
 
 ```sh
-bun run dev        # development, with file watching
-bun run start      # production
-bun run check      # typecheck + lint + tests
+bun run dev                 # development, with file watching
+bun run start               # production
+bun run check               # typecheck + lint + tests
+bun run check:build-number  # verify Discord's live client build number
 ```
 
 The individual quality commands are `bun run typecheck`, `bun run lint`, and
@@ -105,6 +106,7 @@ Quests with tasks outside this list are displayed in the quest list but skipped 
 ```
 src/
 ├── api/            REST client for user-token requests
+│   ├── build-number.ts runtime client build number resolver
 │   ├── client.ts       rate limiting, retries, timeouts
 │   ├── errors.ts       typed API errors
 │   ├── fingerprint.ts  desktop client headers / x-super-properties

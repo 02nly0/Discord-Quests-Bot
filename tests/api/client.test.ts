@@ -10,6 +10,7 @@ import { DiscordApiError } from '../../src/api/errors';
  */
 
 const realFetch = globalThis.fetch;
+const BUILD_NUMBER_URL = 'https://discord.com/app';
 let fetchCalls: Array<{ url: string; method?: string }> = [];
 let responses: Array<() => Response | Promise<Response>> = [];
 
@@ -24,6 +25,12 @@ beforeEach(() => {
 	fetchCalls = [];
 	responses = [];
 	globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+		// Build-number resolution runs in the background whenever the cached
+		// fingerprint is stale. Keep it out of the scripted API response queue.
+		if (String(input) === BUILD_NUMBER_URL) {
+			return new Response('<script>window.GLOBAL_ENV={"BUILD_NUMBER":"649389"}</script>');
+		}
+
 		fetchCalls.push({ url: String(input), method: init?.method });
 		const next = responses.shift();
 		if (!next) throw new Error(`unexpected fetch to ${String(input)}`);

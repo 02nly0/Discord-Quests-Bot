@@ -13,11 +13,11 @@ const MAX_ATTEMPTS = 4;
  * the token be garbage-collected once a session is over.
  */
 export class DiscordApiClient {
-	readonly #headers: Record<string, string>;
+	readonly #token: string;
 	readonly #rateLimitedUntil = new Map<string, number>();
 
 	constructor(token: string) {
-		this.#headers = buildHeaders(token);
+		this.#token = token;
 	}
 
 	get<T>(path: string): Promise<T> {
@@ -39,7 +39,9 @@ export class DiscordApiClient {
 		try {
 			response = await fetch(url, {
 				method,
-				headers: this.#headers,
+				// Rebuild per request so the cached client build number is re-read
+				// instead of being frozen when the client is constructed.
+				headers: buildHeaders(this.#token),
 				body: body === undefined ? undefined : JSON.stringify(body),
 				signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 			});

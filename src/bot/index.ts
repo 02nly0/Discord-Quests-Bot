@@ -1,10 +1,16 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { resolveBuildNumber } from '../api/build-number';
 import type { BotConfig } from '../config';
 import { log } from '../util/logger';
 import { registerCommands } from './commands';
 import { handleInteraction } from './flow';
 
 export async function startBot(config: BotConfig): Promise<Client> {
+	// Resolve before the gateway connects so the first requests already carry a
+	// current fingerprint. Resolution never throws, even when Discord is down.
+	const buildNumber = await resolveBuildNumber();
+	log('bot', `client build number: ${buildNumber}`);
+
 	const client = new Client({
 		intents: [GatewayIntentBits.Guilds],
 	});
