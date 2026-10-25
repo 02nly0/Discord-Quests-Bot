@@ -24,13 +24,14 @@ import { describeError } from '../util/format';
 import { ThrottledEditor } from '../util/throttle';
 import {
 	invalidTokenEmbed,
+	noQuestsEmbed,
 	progressEmbed,
 	questEmbed,
 	summaryEmbed,
 	errorEmbed,
 	type AutomationSnapshot,
 } from './embeds';
-import { activeRuns, pendingSetups } from './registry';
+import { activeRuns, pendingSetups, type PendingSetup } from './registry';
 
 const PROGRESS_EDIT_INTERVAL_MS = 4_000;
 
@@ -41,6 +42,7 @@ const STOP_ID = 'quests:stop';
 const PREV_ID = 'quests:prev';
 const NEXT_ID = 'quests:next';
 const CONFIRM_ID = 'quests:confirm';
+const TOGGLE_COMPLETED_ID = 'quests:toggle-completed';
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
 	try {
@@ -54,6 +56,8 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 			await browseQuests(interaction, 1);
 		} else if (interaction.isButton() && interaction.customId === CONFIRM_ID) {
 			await confirmQuest(interaction);
+		} else if (interaction.isButton() && interaction.customId === TOGGLE_COMPLETED_ID) {
+			await toggleCompleted(interaction);
 		} else if (interaction.isButton() && interaction.customId === COMPLETE_ALL_ID) {
 			await startRun(interaction, null);
 		} else if (interaction.isButton() && interaction.customId === STOP_ID) {
@@ -101,15 +105,36 @@ async function beginQuestSetup(interaction: ModalSubmitInteraction): Promise<voi
 		return;
 	}
 
-	pendingSetups.set(interaction.user.id, { client, quests, index: 0 });
-	await interaction.editReply({
-		embeds: [questEmbed(quests[0], 0, quests.length)],
-		components: questRows(quests, 0),
-	});
+	const setup: PendingSetup = { client, quests, index: 0, showCompleted: false };
+	pendingSetups.set(interaction.user.id, setup);
+	await interaction.editReply(setupView(setup));
 }
 
-function questRows(quests: Quest[], index: number): ActionRowBuilder<ButtonBuilder>[] {
-	const quest = quests[index];
+/**
+ * Completed quests stay in the list but move to the end, so the quests that
+ * still pay out come first and the finished ones never block browsing.
+ */
+function orderedQuests(quests: Quest[]): Quest[] {
+	return [...quests.filter((quest) => !quest.isCompleted), ...quests.filter((quest) => quest.isCompleted)];
+}
+
+function visibleQuests(setup: PendingSetup): Quest[] {
+	const ordered = orderedQuests(setup.quests);
+	return setup.showCompleted ? ordered : ordered.filter((quest) => !quest.isCompleted);
+}
+
+function setupView(setup: PendingSetup) {
+	const quests = visibleQuests(setup);
+	const quest = quests[setup.index];
+	return {
+		embeds: [quest ? questEmbed(quest, setup.index, quests.length) : noQuestsEmbed()],
+		components: questRows(setup, quests),
+	};
+}
+
+function questRows(setup: PendingSetup, quests: Quest[]): ActionRowBuilder<ButtonBuilder>[] {
+	const quest = quests[setup.index];
+	const completed = setup.quests.filter((item) => item.isCompleted).length;
 	const canBrowse = quests.length > 1;
 
 	const back = new ButtonBuilder()
@@ -122,7 +147,7 @@ function questRows(quests: Quest[], index: number): ActionRowBuilder<ButtonBuild
 		.setCustomId(CONFIRM_ID)
 		.setLabel('Confirm')
 		.setStyle(ButtonStyle.Success)
-		.setDisabled(!quest.isAutomatable);
+		.setDisabled(!quest?.isAutomatable);
 
 	const next = new ButtonBuilder()
 		.setCustomId(NEXT_ID)
@@ -130,15 +155,21 @@ function questRows(quests: Quest[], index: number): ActionRowBuilder<ButtonBuild
 		.setStyle(ButtonStyle.Secondary)
 		.setDisabled(!canBrowse);
 
+	const toggle = new ButtonBuilder()
+		.setCustomId(TOGGLE_COMPLETED_ID)
+		.setLabel(`${setup.showCompleted ? 'Hide' : 'Show'} completed${completed > 0 ? ` (${completed})` : ''}`)
+		.setStyle(setup.showCompleted ? ButtonStyle.Primary : ButtonStyle.Secondary)
+		.setDisabled(completed === 0);
+
 	const completeAll = new ButtonBuilder()
 		.setCustomId(COMPLETE_ALL_ID)
 		.setLabel('Complete all quests')
 		.setStyle(ButtonStyle.Secondary)
-		.setDisabled(automatableQuests(quests).length === 0);
+		.setDisabled(automatableQuests(setup.quests).length === 0);
 
 	return [
 		new ActionRowBuilder<ButtonBuilder>().addComponents(back, confirm, next),
-		new ActionRowBuilder<ButtonBuilder>().addComponents(completeAll),
+		new ActionRowBuilder<ButtonBuilder>().addComponents(toggle, completeAll),
 	];
 }
 
@@ -149,11 +180,24 @@ async function browseQuests(interaction: ButtonInteraction, step: number): Promi
 		return;
 	}
 
-	setup.index = (setup.index + step + setup.quests.length) % setup.quests.length;
-	await interaction.update({
-		embeds: [questEmbed(setup.quests[setup.index], setup.index, setup.quests.length)],
-		components: questRows(setup.quests, setup.index),
-	});
+	const quests = visibleQuests(setup);
+	if (quests.length > 0) {
+		setup.index = (setup.index + step + quests.length) % quests.length;
+	}
+	await interaction.update(setupView(setup));
+}
+
+async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
+	const setup = pendingSetups.get(interaction.user.id);
+	if (!setup) {
+		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
+		return;
+	}
+
+	setup.showCompleted = !setup.showCompleted;
+	const quests = visibleQuests(setup);
+	setup.index = Math.min(setup.index, Math.max(0, quests.length - 1));
+	await interaction.update(setupView(setup));
 }
 
 async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
@@ -163,7 +207,13 @@ async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
 		return;
 	}
 
-	await startRun(interaction, setup.quests[setup.index].id);
+	const quest = visibleQuests(setup)[setup.index];
+	if (!quest) {
+		await interaction.reply({ content: 'Pick a quest first.', ephemeral: true });
+		return;
+	}
+
+	await startRun(interaction, quest.id);
 }
 
 async function startRun(interaction: ButtonInteraction, questId: string | null): Promise<void> {

@@ -20,6 +20,13 @@ export interface QuestReward {
 	imageUrl: string | null;
 }
 
+const IMAGE_PATH = /\.(png|jpe?g|webp|gif)(\?|$)/i;
+const PLACEHOLDER = 'PLACEHOLDER';
+
+function realText(value: string | undefined): string | null {
+	return value && value !== PLACEHOLDER ? value : null;
+}
+
 function positiveNumber(value: number | undefined): number {
 	return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 }
@@ -58,6 +65,20 @@ export class Quest {
 		return this.payload.config.messages?.game_title ?? '';
 	}
 
+	get publisher(): string | null {
+		return realText(this.payload.config.messages?.game_publisher);
+	}
+
+	/** Promo line Discord shows under the quest name, if the quest ships one. */
+	get tagline(): string | null {
+		const definitions = this.payload.config.task_config_v2?.tasks ?? this.payload.config.task_config?.tasks ?? {};
+		for (const definition of Object.values(definitions)) {
+			const description = realText(definition.messages?.task_description);
+			if (description) return description;
+		}
+		return realText(this.payload.config.cta_config?.subtitle);
+	}
+
 	get displayName(): string {
 		return this.gameName ? `${this.gameName}: ${this.questName}` : this.questName;
 	}
@@ -74,9 +95,14 @@ export class Quest {
 				type: reward.type ?? null,
 				orbs,
 				premiumOrbs: positiveNumber(reward.premium_orb_quantity) || orbs,
-				imageUrl: this.assetUrl(reward.asset),
+				imageUrl: this.imageUrl(reward.asset),
 			};
 		});
+	}
+
+	/** Reward art to feature in the embed, when Discord ships a still image for it. */
+	get rewardImageUrl(): string | null {
+		return this.rewards.find((reward) => reward.imageUrl)?.imageUrl ?? null;
 	}
 
 	get applicationId(): string | null {
@@ -92,25 +118,44 @@ export class Quest {
 	}
 
 	get tileUrl(): string | null {
-		return this.assetUrl(this.payload.config.assets?.game_tile);
+		const assets = this.payload.config.assets;
+		return (
+			this.imageUrl(assets?.game_tile_light) ?? this.imageUrl(assets?.game_tile_dark) ?? this.imageUrl(assets?.game_tile)
+		);
 	}
 
 	get heroUrl(): string | null {
-		return this.assetUrl(this.payload.config.assets?.hero);
+		const assets = this.payload.config.assets;
+		return this.imageUrl(assets?.hero) ?? this.imageUrl(assets?.quest_bar_hero);
 	}
 
 	get logotypeUrl(): string | null {
-		return this.assetUrl(this.payload.config.assets?.logotype);
+		const assets = this.payload.config.assets;
+		return (
+			this.imageUrl(assets?.logotype_light) ?? this.imageUrl(assets?.logotype_dark) ?? this.imageUrl(assets?.logotype)
+		);
 	}
 
 	private assetUrl(path: string | undefined): string | null {
-		if (!path) return null;
+		if (!path || path === PLACEHOLDER) return null;
 		const base = 'https://cdn.discordapp.com';
 		return path.startsWith('quests/') ? `${base}/${path}` : `${base}/quests/${this.id}/${path}`;
 	}
 
+	private imageUrl(path: string | undefined): string | null {
+		const url = this.assetUrl(path);
+		return url && IMAGE_PATH.test(url) ? url : null;
+	}
+
 	get expiresAt(): Date | null {
 		const raw = this.payload.config.expires_at;
+		if (!raw) return null;
+		const date = new Date(raw);
+		return Number.isNaN(date.getTime()) ? null : date;
+	}
+
+	get rewardsExpireAt(): Date | null {
+		const raw = this.payload.config.rewards_config?.rewards_expire_at;
 		if (!raw) return null;
 		const date = new Date(raw);
 		return Number.isNaN(date.getTime()) ? null : date;

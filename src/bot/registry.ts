@@ -5,6 +5,7 @@ export interface PendingSetup {
 	client: DiscordApiClient;
 	quests: Quest[];
 	index: number;
+	showCompleted: boolean;
 }
 
 export interface ActiveRun {

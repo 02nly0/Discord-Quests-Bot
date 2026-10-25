@@ -20,6 +20,7 @@ export interface QuestConfigPayload {
 	rewards_config?: RewardsConfigPayload;
 	task_config?: TaskConfigPayload;
 	task_config_v2?: TaskConfigPayload;
+	cta_config?: CtaConfigPayload;
 	starts_at?: string;
 	expires_at?: string;
 }
@@ -36,9 +37,20 @@ export interface ApplicationPayload {
 
 export interface QuestAssetsPayload {
 	game_tile?: string;
+	game_tile_light?: string;
+	game_tile_dark?: string;
 	hero?: string;
 	hero_video?: string;
+	quest_bar_hero?: string;
 	logotype?: string;
+	logotype_light?: string;
+	logotype_dark?: string;
+}
+
+export interface CtaConfigPayload {
+	link?: string;
+	button_label?: string;
+	subtitle?: string;
 }
 
 export interface QuestMessagesPayload {
@@ -49,6 +61,7 @@ export interface QuestMessagesPayload {
 
 export interface RewardsConfigPayload {
 	rewards?: RewardPayload[];
+	rewards_expire_at?: string;
 }
 
 export interface RewardPayload {
@@ -67,6 +80,10 @@ export interface TaskConfigPayload {
 
 export interface TaskDefinitionPayload {
 	target?: number;
+	messages?: {
+		task_title?: string;
+		task_description?: string;
+	};
 }
 
 export interface UserStatusPayload {

@@ -59,7 +59,7 @@ describe('questEmbed', () => {
 		).toJSON();
 
 		const reward = embed.fields?.find((field) => field.name === 'Reward');
-		expect(reward?.value).toBe('1,000 Orbs (1,200 with Nitro)\nWumpus in a Box (Collectible)');
+		expect(reward?.value).toBe('**1,000 Orbs**\n-# 1,200 Orbs with Nitro\n\n**Wumpus in a Box**\n-# Collectible');
 	});
 
 	it('names the reward type when the reward name is specific', () => {
@@ -70,7 +70,7 @@ describe('questEmbed', () => {
 		).toJSON();
 
 		const reward = embed.fields?.find((field) => field.name === 'Reward');
-		expect(reward?.value).toBe('Cybernetic Headgear (Redeemable code)');
+		expect(reward?.value).toBe('**Cybernetic Headgear**\n-# Redeemable code');
 	});
 
 	it('uses the quest art for the thumbnail and banner', () => {
@@ -117,6 +117,63 @@ describe('questEmbed', () => {
 		expect(embed.image).toBeUndefined();
 	});
 
+	it('ignores placeholder art and uses the published game tile', () => {
+		const embed = questEmbed(
+			quest('a', {
+				assets: {
+					game_tile: 'PLACEHOLDER',
+					logotype: 'PLACEHOLDER',
+					game_tile_light: 'quests/a/tile.png',
+					logotype_light: 'quests/a/logo.png',
+				},
+			}),
+			0,
+			1,
+		).toJSON();
+
+		expect(embed.thumbnail?.url).toBe('https://cdn.discordapp.com/quests/a/tile.png');
+		expect(embed.author?.icon_url).toBe('https://cdn.discordapp.com/quests/a/logo.png');
+	});
+
+	it('does not use a reward video as the thumbnail', () => {
+		const embed = questEmbed(
+			quest('a', {
+				assets: { game_tile_light: 'quests/a/tile.png' },
+				rewards_config: { rewards: [{ type: 3, asset: 'decoration.mp4', messages: { name: 'Decoration' } }] },
+			}),
+			0,
+			1,
+		).toJSON();
+
+		expect(embed.thumbnail?.url).toBe('https://cdn.discordapp.com/quests/a/tile.png');
+	});
+
+	it('shows the promo tagline under the quest name', () => {
+		const embed = questEmbed(
+			quest('a', {
+				task_config_v2: {
+					tasks: {
+						WATCH_VIDEO: { target: 20, messages: { task_description: 'Watch the launch trailer.' } },
+					},
+				},
+			}),
+			0,
+			1,
+		).toJSON();
+
+		expect(embed.description).toBe('Watch the launch trailer.');
+	});
+
+	it('names the publisher in the footer', () => {
+		const embed = questEmbed(
+			quest('a', { messages: { quest_name: 'Quest a', game_title: 'Test Game', game_publisher: 'Test Studio' } }),
+			2,
+			7,
+		).toJSON();
+
+		expect(embed.footer?.text).toBe('Test Studio · Quest 3 of 7');
+	});
+
 	it('uses the quest brand color and falls back to the default', () => {
 		expect(questEmbed(quest('a', { colors: { primary: '#E944D4' } }), 0, 1).toJSON().color).toBe(0xe944d4);
 		expect(questEmbed(quest('a'), 0, 1).toJSON().color).toBe(COLORS.primary);
@@ -131,6 +188,20 @@ describe('questEmbed', () => {
 
 		expect(embed.description).toContain('Completed');
 		expect(progress?.value).toContain('100%');
+	});
+
+	it('shows the claim deadline once a quest is completed', () => {
+		const payload = quest('a', {
+			rewards_config: { rewards: [], rewards_expire_at: '2026-11-05T00:00:00.000Z' },
+		}).payload;
+		payload.user_status = { completed_at: '2026-10-02T00:00:00.000Z' };
+
+		const embed = questEmbed(new Quest(payload), 0, 1).toJSON();
+		const claim = embed.fields?.find((field) => field.name === 'Claim by');
+		const at = Math.floor(Date.parse('2026-11-05T00:00:00.000Z') / 1000);
+
+		expect(claim?.value).toBe(`<t:${at}:R>`);
+		expect(embed.fields?.some((field) => field.name === 'Ends')).toBe(false);
 	});
 
 	it('explains a quest the bot cannot run', () => {

@@ -20,7 +20,7 @@ The quest engine lives in its own module with **zero discord.js dependency**, so
 
 ## ✨ Features
 
-- **Quest browser** - page through every active quest with **Back** and **Next**, see its art, reward, and progress, then press **Confirm** to run it. **Complete all quests** sweeps the rest.
+- **Quest browser** - page through every active quest with **Back** and **Next**, see its art, reward, and progress, then press **Confirm** to run it. Completed quests stay out of the way until you press **Show completed**. **Complete all quests** sweeps the rest.
 - **Live progress embeds** - a throttled, rate-limit-safe progress bar updates in real time; stop at any moment mid-heartbeat.
 - **Full quest coverage** - video quests (watch trailers) and game quests (desktop, Xbox, PlayStation, streaming, play activity) are all automated.
 - **Production-grade API client** - per-route rate limiting, 429 backoff, transient-failure retries, request timeouts, and typed errors.
@@ -72,7 +72,7 @@ The individual quality commands are `bun run typecheck`, `bun run lint`, and
 1. Run **`/quests`** in any server the bot is in.
 2. Paste your **Discord user token** into the modal.
 3. The bot shows your quests one at a time, with the game art, reward, expiry, and progress.
-4. Use **Back** and **Next** to browse, then press **Confirm** to complete the quest you picked, or **Complete all quests** to run every supported one.
+4. Use **Back** and **Next** to browse, then press **Confirm** to complete the quest you picked, or **Complete all quests** to run every supported one. Finished quests are hidden by default; press **Show completed** to browse them at the end of the list.
 5. Watch the progress embed, press **Stop** whenever you like.
 6. Claim your rewards in the Discord client and enjoy.
 

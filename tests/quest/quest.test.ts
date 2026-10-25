@@ -65,6 +65,14 @@ describe('Quest status flags', () => {
 		expect(unparseable.isExpired).toBe(false);
 	});
 
+	it('reads the reward claim deadline', () => {
+		const quest = new Quest(
+			questPayload({ config: { rewards_config: { rewards_expire_at: '2026-11-05T00:00:00.000Z' } } }),
+		);
+		expect(quest.rewardsExpireAt?.toISOString()).toBe('2026-11-05T00:00:00.000Z');
+		expect(new Quest(questPayload()).rewardsExpireAt).toBeNull();
+	});
+
 	it('is automatable only while incomplete and supported', () => {
 		const fresh = new Quest(questPayload());
 		const completed = new Quest(questPayload({ userStatus: { completed_at: '2026-10-02T00:00:00.000Z' } }));
@@ -97,6 +105,32 @@ describe('Quest.tileUrl', () => {
 		const quest = new Quest(questPayload({ config: { assets: { hero: 'hero.png', logotype: 'quests/abc/logo.png' } } }));
 		expect(quest.heroUrl).toBe('https://cdn.discordapp.com/quests/q1/hero.png');
 		expect(quest.logotypeUrl).toBe('https://cdn.discordapp.com/quests/abc/logo.png');
+	});
+
+	it('skips placeholder art and prefers the published tile variant', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					assets: {
+						game_tile: 'PLACEHOLDER',
+						logotype: 'PLACEHOLDER',
+						game_tile_dark: 'quests/q1/tile-dark.png',
+						game_tile_light: 'quests/q1/tile-light.png',
+						logotype_light: 'quests/q1/logo-light.png',
+					},
+				},
+			}),
+		);
+
+		expect(quest.tileUrl).toBe('https://cdn.discordapp.com/quests/q1/tile-light.png');
+		expect(quest.logotypeUrl).toBe('https://cdn.discordapp.com/quests/q1/logo-light.png');
+	});
+
+	it('ignores art with a non-image extension', () => {
+		const quest = new Quest(
+			questPayload({ config: { assets: { hero: 'hero.mp4', quest_bar_hero: 'quests/q1/bar.jpg' } } }),
+		);
+		expect(quest.heroUrl).toBe('https://cdn.discordapp.com/quests/q1/bar.jpg');
 	});
 });
 
@@ -145,6 +179,49 @@ describe('Quest rewards', () => {
 			}),
 		);
 		expect(quest.rewards[0].imageUrl).toBe('https://cdn.discordapp.com/quests/q1/headgear.png');
+	});
+
+	it('treats a video reward as having no still image', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					rewards_config: { rewards: [{ type: 3, asset: 'decoration.mp4', messages: { name: 'Decoration' } }] },
+				},
+			}),
+		);
+		expect(quest.rewards[0].imageUrl).toBeNull();
+		expect(quest.rewardImageUrl).toBeNull();
+	});
+});
+
+describe('Quest copy', () => {
+	it('exposes the publisher and the promo tagline', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					messages: { quest_name: 'Launch', game_title: 'Test Game', game_publisher: 'Test Studio' },
+					cta_config: { subtitle: 'Play the free trial' },
+				},
+			}),
+		);
+
+		expect(quest.publisher).toBe('Test Studio');
+		expect(quest.tagline).toBe('Play the free trial');
+	});
+
+	it('prefers the task description over the call to action subtitle', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					cta_config: { subtitle: 'Play now' },
+					task_config_v2: {
+						tasks: { WATCH_VIDEO: { target: 30, messages: { task_description: 'Watch the trailer' } } },
+					},
+				},
+			}),
+		);
+
+		expect(quest.tagline).toBe('Watch the trailer');
 	});
 });
 
