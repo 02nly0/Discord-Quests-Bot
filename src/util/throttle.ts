@@ -1,12 +1,14 @@
 /**
  * Coalesces rapid update requests into edits spaced at least `minIntervalMs`
- * apart, always trailing with the latest state. Used to keep live progress
- * messages under Discord's rate limits without losing the final update.
+ * apart. While a run is pending, later requests are absorbed into it and the
+ * run always reads the latest state, so no update is ever lost and no burst
+ * ever produces more runs than the interval allows.
  */
 export class ThrottledEditor {
 	#lastRunAt = 0;
 	#timer: ReturnType<typeof setTimeout> | null = null;
-	#queued = false;
+	#inFlight: Promise<void> | null = null;
+	#disposed = false;
 
 	constructor(
 		private readonly update: () => Promise<unknown>,
@@ -14,39 +16,40 @@ export class ThrottledEditor {
 	) {}
 
 	request(): void {
-		if (this.#timer) {
-			this.#queued = true;
-			return;
-		}
+		if (this.#disposed || this.#timer) return;
 
-		const wait = this.minIntervalMs - (Date.now() - this.#lastRunAt);
-		if (wait <= 0) {
-			void this.#run();
-			return;
-		}
-
+		const wait = Math.max(0, this.minIntervalMs - (Date.now() - this.#lastRunAt));
 		this.#timer = setTimeout(() => {
 			this.#timer = null;
 			void this.#run();
 		}, wait);
 	}
 
-	/** Cancels any pending throttled run without performing an update. */
-	dispose(): void {
+	/**
+	 * Stops future updates, cancels any queued run, and resolves once an
+	 * in-flight edit has settled. Await this before replacing the message so a
+	 * late progress edit can never overwrite the terminal state.
+	 */
+	async dispose(): Promise<void> {
+		this.#disposed = true;
 		if (this.#timer) {
 			clearTimeout(this.#timer);
 			this.#timer = null;
 		}
-		this.#queued = false;
+		await this.#inFlight;
 	}
 
 	async #run(): Promise<void> {
 		this.#lastRunAt = Date.now();
-		await this.update().catch(() => undefined);
-
-		if (this.#queued) {
-			this.#queued = false;
-			this.request();
+		const update = this.update().then(
+			() => undefined,
+			() => undefined,
+		);
+		this.#inFlight = update;
+		try {
+			await update;
+		} finally {
+			if (this.#inFlight === update) this.#inFlight = null;
 		}
 	}
 }

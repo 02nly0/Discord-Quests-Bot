@@ -11,7 +11,8 @@ export interface DiscordUser {
  * validation is `fetchCurrentUser` hitting the API.
  */
 export function isTokenShaped(token: string): boolean {
-	return token.split('.').every((part) => part.length > 0) && token.split('.').length === 3;
+	const parts = token.split('.');
+	return parts.length === 3 && parts.every((part) => part.length > 0);
 }
 
 /** Strips surrounding quotes and whitespace users tend to paste along. */

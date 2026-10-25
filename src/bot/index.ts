@@ -12,7 +12,9 @@ export async function startBot(config: BotConfig): Promise<Client> {
 	client.once(Events.ClientReady, async (ready) => {
 		log('bot', `logged in as ${ready.user.tag}`);
 		try {
-			await registerCommands(ready, config.guildId);
+			const applicationId = ready.application?.id;
+			if (!applicationId) throw new Error('Discord did not expose an application id');
+			await registerCommands(config.botToken, applicationId, config.guildId);
 			log('bot', config.guildId ? 'commands registered (guild)' : 'commands registered (global)');
 		} catch (error) {
 			log('bot', `command registration failed: ${String(error)}`);

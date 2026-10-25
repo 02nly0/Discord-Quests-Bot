@@ -4,9 +4,15 @@
  * basic client fingerprinting, so it needs to be present and well-formed.
  */
 
+// These values mirror the current Discord desktop build. They need a periodic
+// refresh when Discord ships a new client: very stale fingerprints can start
+// being rejected by the quest endpoints even though older ones usually work.
+const CLIENT_VERSION = '1.0.9171';
+const CLIENT_BUILD_NUMBER = 351462;
+
 const USER_AGENT =
 	'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
-	'discord/1.0.9171 Chrome/126.0.0.0 Electron/31.3.0 Safari/537.36';
+	`discord/${CLIENT_VERSION} Chrome/126.0.0.0 Electron/31.3.0 Safari/537.36`;
 
 function encodeSuperProperties(): string {
 	const properties = {
@@ -23,7 +29,7 @@ function encodeSuperProperties(): string {
 		referrer_current: 'https://discord.com/quests',
 		referring_domain_current: 'discord.com',
 		release_channel: 'stable',
-		client_build_number: 351462,
+		client_build_number: CLIENT_BUILD_NUMBER,
 		client_event_source: null,
 		client_launch_id: crypto.randomUUID(),
 		client_app_state: 'focused',

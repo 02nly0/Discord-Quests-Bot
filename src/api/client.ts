@@ -28,12 +28,7 @@ export class DiscordApiClient {
 		return this.#request<T>('POST', path, body);
 	}
 
-	async #request<T>(
-		method: 'GET' | 'POST',
-		path: string,
-		body?: unknown,
-		attempt = 0,
-	): Promise<T> {
+	async #request<T>(method: 'GET' | 'POST', path: string, body?: unknown, attempt = 0): Promise<T> {
 		const url = `${API_BASE}${path}`;
 		const route = `${method} ${path}`;
 
@@ -61,6 +56,10 @@ export class DiscordApiClient {
 
 		if (response.status === 429) {
 			const payload = (await response.json().catch(() => null)) as { retry_after?: number } | null;
+			// Retrying 429s is capped like every other failure mode. A route
+			// that keeps rate-limiting (or reports retry_after: 0) must not
+			// trap the client in an endless loop.
+			if (attempt + 1 >= MAX_ATTEMPTS) throw new DiscordApiError(429, payload);
 			const retryAfter = payload?.retry_after ?? 1;
 			await sleep(retryAfter * 1000);
 			return this.#request<T>(method, path, body, attempt + 1);

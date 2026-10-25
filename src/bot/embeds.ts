@@ -19,7 +19,7 @@ export function questListEmbed(quests: Quest[]): EmbedBuilder {
 		.setTitle('Your Discord Quests')
 		.setDescription(
 			`${automatable.length} of ${quests.length} active quests can be completed automatically. ` +
-			'Choose a quest below, or run them all.',
+				'Choose a quest below, or run them all.',
 		);
 
 	for (const quest of quests.slice(0, 10)) {
@@ -86,17 +86,13 @@ export function summaryEmbed(result: QuestBatchResult, elapsedMs: number): Embed
 		embed.setTitle('Nothing was completed');
 	}
 
-	const lines = [
-		`**Completed:** ${finished}`,
-		`**Failed:** ${failed}`,
-		`**Duration:** ${formatElapsed(elapsedMs)}`,
-	];
+	const lines = [`**Completed:** ${finished}`, `**Failed:** ${failed}`, `**Duration:** ${formatElapsed(elapsedMs)}`];
 
 	for (const { quest, reason } of result.failed.slice(0, 3)) {
 		lines.push(`- ${truncate(quest.displayName, 80)}: ${truncate(reason, 120)}`);
 	}
 
-	embed.setDescription(lines.join('\n') + '\n\nClaim your rewards in the Discord client.');
+	embed.setDescription(`${lines.join('\n')}\n\nClaim your rewards in the Discord client.`);
 
 	return embed;
 }
@@ -105,9 +101,7 @@ export function invalidTokenEmbed(): EmbedBuilder {
 	return new EmbedBuilder()
 		.setColor(COLORS.danger)
 		.setTitle('Invalid token')
-		.setDescription(
-			'That token was rejected by Discord. Make sure you copied a **user token** and try `/quests` again.',
-		);
+		.setDescription('That token was rejected by Discord. Make sure you copied a **user token** and try `/quests` again.');
 }
 
 export function errorEmbed(message: string): EmbedBuilder {

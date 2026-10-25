@@ -9,6 +9,7 @@ import {
 	type ButtonInteraction,
 	type ChatInputCommandInteraction,
 	type Interaction,
+	type Message,
 	type ModalSubmitInteraction,
 	type StringSelectMenuInteraction,
 } from 'discord.js';
@@ -167,6 +168,9 @@ async function startRun(
 	pendingSetups.delete(interaction.user.id);
 
 	await interaction.deferUpdate();
+	// The picker has served its purpose; removing its components also prevents
+	// the same buttons being pressed again while this run is active.
+	await interaction.editReply({ components: [] }).catch(() => undefined);
 	await runBatch(interaction, setup.client, queue, controller);
 }
 
@@ -177,10 +181,12 @@ async function runBatch(
 	controller: AbortController,
 ): Promise<void> {
 	const startedAt = Date.now();
-	const firstTask = queue[0]!.solvableTask;
+	const firstQuest = queue[0];
+	if (!firstQuest) throw new Error('cannot start a run with an empty quest queue');
+	const firstTask = firstQuest.solvableTask;
 
 	const snapshot: AutomationSnapshot = {
-		questName: queue[0]!.displayName,
+		questName: firstQuest.displayName,
 		index: 1,
 		total: queue.length,
 		completedCount: 0,
@@ -189,12 +195,24 @@ async function runBatch(
 		percent: firstTask?.percent ?? 0,
 	};
 
-	const refresh = new ThrottledEditor(
-		() => interaction.editReply({ embeds: [progressEmbed(snapshot)], components: [stopRow()] }),
-		PROGRESS_EDIT_INTERVAL_MS,
-	);
+	let progressMessage: Message | undefined;
+	let refresh: ThrottledEditor | undefined;
 
 	try {
+		// Interaction tokens expire after ~15 minutes, which is shorter than a
+		// full batch of game quests. A follow-up is a normal channel message, so
+		// the bot token can keep editing it for as long as the run takes.
+		progressMessage = await interaction.followUp({
+			embeds: [progressEmbed(snapshot)],
+			components: [stopRow()],
+		});
+
+		const message = progressMessage;
+		refresh = new ThrottledEditor(
+			() => message.edit({ embeds: [progressEmbed(snapshot)], components: [stopRow()] }),
+			PROGRESS_EDIT_INTERVAL_MS,
+		);
+
 		const result = await completeQuests({
 			client,
 			quests: queue,
@@ -207,33 +225,40 @@ async function runBatch(
 					snapshot.current = task?.current ?? 0;
 					snapshot.target = task?.target ?? 0;
 					snapshot.percent = task?.percent ?? 0;
-					refresh.request();
+					refresh?.request();
 				},
 				onQuestProgress(_quest, update) {
 					snapshot.current = update.current;
 					snapshot.target = update.target;
 					snapshot.percent = update.percent;
-					refresh.request();
+					refresh?.request();
 				},
 				onQuestCompleted() {
 					snapshot.completedCount += 1;
-					refresh.request();
+					refresh?.request();
 				},
 			},
 		});
 
-		await interaction.editReply({
+		// Let an in-flight progress edit settle before the summary replaces it,
+		// otherwise a slow edit could land afterwards and overwrite the summary.
+		await refresh.dispose();
+		await message.edit({
 			embeds: [summaryEmbed(result, Date.now() - startedAt)],
 			components: [],
 		});
 	} catch (error) {
 		log('bot', `automation failed: ${describeError(error)}`);
-		await interaction
-			.editReply({ embeds: [errorEmbed(describeError(error))], components: [] })
-			.catch(() => undefined);
+		await refresh?.dispose();
+		const embed = errorEmbed(describeError(error));
+		if (progressMessage) {
+			await progressMessage.edit({ embeds: [embed], components: [] }).catch(() => undefined);
+		} else {
+			await interaction.editReply({ embeds: [embed], components: [] }).catch(() => undefined);
+		}
 	} finally {
-		// A queued progress edit must never land after the summary embed.
-		refresh.dispose();
+		// Covers the error paths that never reached the explicit dispose above.
+		await refresh?.dispose();
 		activeRuns.delete(interaction.user.id);
 	}
 }

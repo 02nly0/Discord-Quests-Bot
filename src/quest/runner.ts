@@ -2,13 +2,8 @@ import type { DiscordApiClient } from '../api/client';
 import { sleep } from '../util/time';
 import { resolveExecutablePath } from './executables';
 import type { Quest } from './quest';
-import {
-	GAME_HEARTBEAT_INTERVAL_MS,
-	STALL_TIMEOUT_MS,
-	VIDEO_HEARTBEAT_INTERVAL_MS,
-	isVideoTask,
-} from './tasks';
-import type { TaskProgressPayload, UserStatusPayload } from './types';
+import { GAME_HEARTBEAT_INTERVAL_MS, STALL_TIMEOUT_MS, VIDEO_HEARTBEAT_INTERVAL_MS, isVideoTask } from './tasks';
+import type { UserStatusPayload } from './types';
 
 const MAX_CONSECUTIVE_ERRORS = 5;
 
@@ -78,7 +73,7 @@ export async function runQuest(options: {
 		if (signal?.aborted) return 'aborted';
 
 		try {
-			const response = await sendHeartbeat(client, quest, plan, false, current);
+			const response = await sendHeartbeat(client, quest, plan, false);
 			const observed = readProgress(response, task.id, plan, target);
 
 			if (observed.current > current) {
@@ -113,7 +108,7 @@ export async function runQuest(options: {
 	// Game sessions need a final heartbeat with terminal: true so Discord
 	// stops expecting the client to report. Video progress has no equivalent.
 	if (!plan.video) {
-		await sendHeartbeat(client, quest, plan, true, current).catch(() => undefined);
+		await sendHeartbeat(client, quest, plan, true).catch(() => undefined);
 	}
 
 	return 'completed';
@@ -147,11 +142,7 @@ async function planHeartbeat(
 		const applicationId = quest.applicationId;
 		if (applicationId) {
 			plan.applicationId = applicationId;
-			plan.executablePath = await resolveExecutablePath(
-				client,
-				applicationId,
-				quest.applicationName ?? quest.gameName,
-			);
+			plan.executablePath = await resolveExecutablePath(client, applicationId, quest.applicationName ?? quest.gameName);
 		}
 	}
 
@@ -163,7 +154,6 @@ async function sendHeartbeat(
 	quest: Quest,
 	plan: HeartbeatPlan,
 	terminal: boolean,
-	currentProgress: number,
 ): Promise<unknown> {
 	if (plan.video) {
 		const elapsed = Math.max(0, Math.floor(Date.now() / 1000) - plan.startedAtSeconds);
@@ -192,10 +182,10 @@ function readProgress(
 	const status = asRecord(root.user_status) ?? root;
 
 	const progress = asRecord(status.progress) ?? asRecord(root.progress) ?? {};
-	const entry = asRecord(progress[taskId]) as TaskProgressPayload | undefined;
+	const entry = asRecord(progress[taskId]);
 
 	const value = firstNumber(entry?.value, status.stream_progress_seconds, root.stream_progress_seconds);
-	const completedAt = entry?.completed_at ?? status.completed_at ?? root.completed_at;
+	const completedAt = firstString(entry?.completed_at, status.completed_at, root.completed_at);
 
 	// Video endpoints can respond without progress fields; the wall clock is
 	// the source of truth there.
@@ -205,18 +195,25 @@ function readProgress(
 
 	return {
 		current: Math.max(0, videoElapsed, value ?? 0),
-		completed: Boolean(completedAt),
-		completedAt: completedAt ?? undefined,
+		completed: completedAt !== undefined,
+		completedAt,
 	};
 }
 
-function asRecord(value: unknown): Record<string, any> | undefined {
-	return typeof value === 'object' && value !== null ? (value as Record<string, any>) : undefined;
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+	return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
 }
 
 function firstNumber(...values: unknown[]): number | undefined {
 	for (const value of values) {
 		if (typeof value === 'number' && Number.isFinite(value)) return value;
+	}
+	return undefined;
+}
+
+function firstString(...values: unknown[]): string | undefined {
+	for (const value of values) {
+		if (typeof value === 'string') return value;
 	}
 	return undefined;
 }
