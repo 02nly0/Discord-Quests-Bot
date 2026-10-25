@@ -31,7 +31,7 @@ describe('ThrottledEditor', () => {
 		await sleep(150);
 
 		expect(times.length).toBe(2);
-		expect(times[1]! - times[0]!).toBeGreaterThanOrEqual(50);
+		expect(times[1] - times[0]).toBeGreaterThanOrEqual(50);
 	});
 
 	it('runs a trailing update when requests arrive during a run', async () => {

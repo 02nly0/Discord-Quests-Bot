@@ -49,7 +49,7 @@ describe('DiscordApiClient', () => {
 
 		await expect(client.get('/quests/@me')).resolves.toEqual({ quests: [] });
 		expect(fetchCalls.length).toBe(1);
-		expect(fetchCalls[0]!.url).toBe('https://discord.com/api/v9/quests/@me');
+		expect(fetchCalls[0].url).toBe('https://discord.com/api/v9/quests/@me');
 	});
 
 	it('returns undefined for 204 responses', async () => {

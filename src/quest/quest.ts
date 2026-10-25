@@ -1,4 +1,4 @@
-import type { QuestPayload, UserStatusPayload } from './types';
+import type { QuestPayload } from './types';
 import { isSupportedTask } from './tasks';
 import { formatDuration } from '../util/time';
 import { progressBar } from '../util/format';
@@ -81,7 +81,7 @@ export class Quest {
 
 		return Object.entries(definitions)
 			.map(([id, definition]) => {
-				const target = definition?.target ?? 0;
+				const target = definition.target ?? 0;
 				const current = progress[id]?.value ?? 0;
 				return {
 					id,
@@ -107,10 +107,8 @@ export class Quest {
 
 	/** Writes heartbeat results back so embeds and re-runs see live state. */
 	markProgress(taskId: string, current: number, completedAt?: string): void {
-		if (!this.payload.user_status) {
-			this.payload.user_status = { progress: {} };
-		}
-		const status: UserStatusPayload = this.payload.user_status;
+		this.payload.user_status ??= { progress: {} };
+		const status = this.payload.user_status;
 
 		status.progress ??= {};
 		const entry = status.progress[taskId] ?? {};

@@ -13,7 +13,7 @@ import { getCachedBuildNumber } from './build-number';
 const CLIENT_VERSION = '1.0.1281';
 const CHROME_VERSION = '152.0.7977.167';
 const ELECTRON_VERSION = '44.9.3';
-const CHROME_MAJOR_VERSION = CHROME_VERSION.split('.')[0] ?? CHROME_VERSION;
+const CHROME_MAJOR_VERSION = CHROME_VERSION.split('.')[0];
 
 const USER_AGENT =
 	'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) ' +

@@ -1,8 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
-import type { Quest } from '../quest';
+import type { Quest, QuestBatchResult } from '../quest';
 import { progressBar, truncate } from '../util/format';
 import { formatDuration, formatElapsed } from '../util/time';
-import type { QuestBatchResult } from '../quest';
 
 export const COLORS = {
 	primary: 0x5865f2,
@@ -30,7 +29,7 @@ export function questListEmbed(quests: Quest[]): EmbedBuilder {
 	}
 
 	if (quests.length > 10) {
-		embed.setFooter({ text: `And ${quests.length - 10} more quest(s) - use the menu to pick one.` });
+		embed.setFooter({ text: `Showing 10 of ${quests.length}. Use the menu to pick one.` });
 	}
 
 	return embed;

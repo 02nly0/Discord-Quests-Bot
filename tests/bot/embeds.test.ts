@@ -32,7 +32,7 @@ describe('questListEmbed', () => {
 		const embed = questListEmbed(quests).toJSON();
 
 		expect(embed.fields).toHaveLength(10);
-		expect(embed.footer?.text).toContain('And 2 more quest(s)');
+		expect(embed.footer?.text).toContain('Showing 10 of 12');
 	});
 });
 

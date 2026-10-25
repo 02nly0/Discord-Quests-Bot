@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import type { DiscordApiClient } from '../../src/api/client';
+import { fakeApiClient } from '../testing/fake-client';
 import { cleanToken, fetchCurrentUser, isTokenShaped } from '../../src/api/token';
-
-/** Builds a client stub whose GET resolves to whatever the factory returns. */
-function clientReturning(get: () => unknown): DiscordApiClient {
-	return { get: async () => get() } as unknown as DiscordApiClient;
-}
 
 describe('isTokenShaped', () => {
 	it('accepts three non-empty dot-separated segments', () => {
@@ -37,18 +32,22 @@ describe('cleanToken', () => {
 
 describe('fetchCurrentUser', () => {
 	it('returns the user when the API responds with an id', async () => {
-		const client = clientReturning(() => ({ id: '123', username: 'tester' }));
+		const { client } = fakeApiClient({ get: [() => ({ id: '123', username: 'tester' })] });
 		await expect(fetchCurrentUser(client)).resolves.toEqual({ id: '123', username: 'tester' });
 	});
 
 	it('returns null when the response is not user-shaped', async () => {
-		const client = clientReturning(() => ({ message: 'You are rate limited' }));
+		const { client } = fakeApiClient({ get: [() => ({ message: 'You are rate limited' })] });
 		await expect(fetchCurrentUser(client)).resolves.toBeNull();
 	});
 
 	it('returns null when the request fails', async () => {
-		const client = clientReturning(() => {
-			throw new Error('401');
+		const { client } = fakeApiClient({
+			get: [
+				() => {
+					throw new Error('401');
+				},
+			],
 		});
 		await expect(fetchCurrentUser(client)).resolves.toBeNull();
 	});

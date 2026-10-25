@@ -39,7 +39,7 @@ export async function enroll(client: DiscordApiClient, quest: Quest): Promise<vo
 		is_targeted: false,
 	});
 
-	if (!status?.enrolled_at) {
+	if (!status.enrolled_at) {
 		throw new Error(`Discord refused enrollment for "${quest.displayName}"`);
 	}
 	quest.payload.user_status = { ...quest.payload.user_status, ...status };

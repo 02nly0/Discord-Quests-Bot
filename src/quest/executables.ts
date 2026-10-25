@@ -5,7 +5,7 @@ const executableCache = new Map<string, string>();
 /**
  * Resolves the Windows executable path Discord expects in game heartbeats.
  * The path itself is not validated by Discord beyond shape, so a cached
- * lookup from the public application directory is enough - and when that
+ * lookup from the public application directory is enough, and when that
  * lookup fails, a plausible `win64/<slug>.exe` fallback works as well.
  */
 export async function resolveExecutablePath(

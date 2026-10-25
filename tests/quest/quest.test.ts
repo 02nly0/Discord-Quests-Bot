@@ -105,12 +105,12 @@ describe('Quest.tasks', () => {
 				userStatus: { progress: { PLAY_ACTIVITY: { value: 600 } } },
 			}),
 		);
-		expect(quest.tasks[0]!.completed).toBe(true);
+		expect(quest.tasks[0].completed).toBe(true);
 	});
 
 	it('defaults a missing target to zero', () => {
 		const quest = new Quest(questPayload({ config: { task_config_v2: { tasks: { PLAY_ACTIVITY: {} } } } }));
-		expect(quest.tasks[0]!.target).toBe(0);
+		expect(quest.tasks[0].target).toBe(0);
 	});
 
 	it('falls back to task_config when task_config_v2 is absent', () => {

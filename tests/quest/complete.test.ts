@@ -52,8 +52,8 @@ describe('completeQuests', () => {
 		expect(result.stopped).toBe(false);
 		expect(result.completed.map((quest) => quest.id)).toEqual(['q2']);
 		expect(result.failed).toHaveLength(1);
-		expect(result.failed[0]!.quest.id).toBe('q1');
-		expect(result.failed[0]!.reason).toBe('Discord refused enrollment');
+		expect(result.failed[0].quest.id).toBe('q1');
+		expect(result.failed[0].reason).toBe('Discord refused enrollment');
 		expect(calls.length).toBe(1);
 
 		expect(events).toEqual([

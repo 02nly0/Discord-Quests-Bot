@@ -20,7 +20,7 @@ export async function createApiClient(rawToken: string): Promise<DiscordApiClien
 export async function fetchQuests(client: DiscordApiClient): Promise<Quest[]> {
 	const data = await client.get<{ quests?: QuestPayload[] }>('/quests/@me');
 	return (data.quests ?? [])
-		.filter((payload) => payload?.id && payload.config)
+		.filter((payload) => payload.id && payload.config)
 		.map((payload) => new Quest(payload))
 		.filter((quest) => !quest.isExpired);
 }

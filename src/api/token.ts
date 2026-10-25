@@ -7,7 +7,7 @@ export interface DiscordUser {
 
 /**
  * Loosely validates the token shape: three dot-separated segments, the first
- * being the base64-encoded user ID. This is only a sanity check - the real
+ * being the base64-encoded user ID. This is only a sanity check; the real
  * validation is `fetchCurrentUser` hitting the API.
  */
 export function isTokenShaped(token: string): boolean {
@@ -24,7 +24,7 @@ export function cleanToken(token: string): string {
 export async function fetchCurrentUser(client: DiscordApiClient): Promise<DiscordUser | null> {
 	try {
 		const user = await client.get<DiscordUser>('/users/@me');
-		return typeof user?.id === 'string' ? user : null;
+		return typeof user.id === 'string' ? user : null;
 	} catch {
 		return null;
 	}

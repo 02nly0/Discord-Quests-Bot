@@ -18,7 +18,7 @@ describe('buildHeaders', () => {
 		const encoded = headers['x-super-properties'];
 		expect(encoded).toBeString();
 
-		const properties = JSON.parse(Buffer.from(encoded!, 'base64').toString('utf8')) as Record<string, unknown>;
+		const properties: Record<string, unknown> = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
 		expect(properties).toMatchObject({
 			os: 'Windows',
 			browser: 'Discord Client',

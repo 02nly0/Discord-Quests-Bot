@@ -1,4 +1,4 @@
-import type { DiscordApiClient } from '../../src/api/client';
+import { DiscordApiClient } from '../../src/api/client';
 
 export type RouteHandler = (call: { path: string; body?: unknown }) => unknown;
 
@@ -8,28 +8,33 @@ export type RouteHandler = (call: { path: string; body?: unknown }) => unknown;
  * an API failure, and running past the end of a script fails the test with
  * "unexpected request", so unmocked calls cannot pass silently.
  */
+class ScriptedApiClient extends DiscordApiClient {
+	readonly calls: Array<{ method: 'GET' | 'POST'; path: string; body?: unknown }> = [];
+
+	constructor(private readonly script: { get?: RouteHandler[]; post?: RouteHandler[] }) {
+		super('token');
+	}
+
+	override get<T>(path: string): Promise<T> {
+		return this.#dispatch('GET', path, undefined, this.script.get);
+	}
+
+	override post<T>(path: string, body?: unknown): Promise<T> {
+		return this.#dispatch('POST', path, body, this.script.post);
+	}
+
+	#dispatch<T>(method: 'GET' | 'POST', path: string, body: unknown, queue: RouteHandler[] | undefined): Promise<T> {
+		this.calls.push({ method, path, body });
+		const handler = queue?.shift();
+		if (!handler) throw new Error(`unexpected ${method} ${path}: no scripted handler left`);
+		return Promise.resolve(handler({ path, body }) as T);
+	}
+}
+
 export function fakeApiClient(script: { get?: RouteHandler[]; post?: RouteHandler[] }): {
 	client: DiscordApiClient;
 	calls: Array<{ method: 'GET' | 'POST'; path: string; body?: unknown }>;
 } {
-	const calls: Array<{ method: 'GET' | 'POST'; path: string; body?: unknown }> = [];
-
-	function dispatch(
-		method: 'GET' | 'POST',
-		path: string,
-		body: unknown,
-		queue: RouteHandler[] | undefined,
-	): Promise<unknown> {
-		calls.push({ method, path, body });
-		const handler = queue?.shift();
-		if (!handler) throw new Error(`unexpected ${method} ${path}: no scripted handler left`);
-		return Promise.resolve(handler({ path, body }));
-	}
-
-	const client = {
-		get: (path: string) => dispatch('GET', path, undefined, script.get),
-		post: (path: string, body?: unknown) => dispatch('POST', path, body, script.post),
-	} as unknown as DiscordApiClient;
-
-	return { client, calls };
+	const client = new ScriptedApiClient(script);
+	return { client, calls: client.calls };
 }

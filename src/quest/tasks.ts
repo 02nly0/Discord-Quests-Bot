@@ -19,14 +19,12 @@ export const SUPPORTED_TASKS = [
 
 export type SupportedTask = (typeof SUPPORTED_TASKS)[number];
 
-export const VIDEO_TASKS: readonly string[] = ['WATCH_VIDEO', 'WATCH_VIDEO_ON_MOBILE'];
-
 export function isSupportedTask(taskId: string): taskId is SupportedTask {
-	return (SUPPORTED_TASKS as readonly string[]).includes(taskId);
+	return SUPPORTED_TASKS.some((task) => task === taskId);
 }
 
 export function isVideoTask(taskId: string): boolean {
-	return VIDEO_TASKS.includes(taskId);
+	return taskId === 'WATCH_VIDEO' || taskId === 'WATCH_VIDEO_ON_MOBILE';
 }
 
 export const GAME_HEARTBEAT_INTERVAL_MS = 30_000;

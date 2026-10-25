@@ -53,7 +53,7 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 		} else if (interaction.isButton() && interaction.customId === STOP_ID) {
 			await stopRun(interaction);
 		} else if (interaction.isStringSelectMenu() && interaction.customId === SELECT_ID) {
-			await startRun(interaction, interaction.values[0] ?? null);
+			await startRun(interaction, interaction.values[0]);
 		}
 	} catch (error) {
 		log('bot', `interaction failed: ${describeError(error)}`);
@@ -182,7 +182,6 @@ async function runBatch(
 ): Promise<void> {
 	const startedAt = Date.now();
 	const firstQuest = queue[0];
-	if (!firstQuest) throw new Error('cannot start a run with an empty quest queue');
 	const firstTask = firstQuest.solvableTask;
 
 	const snapshot: AutomationSnapshot = {
@@ -276,7 +275,7 @@ async function stopRun(interaction: ButtonInteraction): Promise<void> {
 	}
 
 	run.controller.abort();
-	await interaction.reply({ content: 'Stopping after the current heartbeat…', ephemeral: true });
+	await interaction.reply({ content: 'Stopping after the current heartbeat.', ephemeral: true });
 }
 
 /** Best-effort fallback when a handler throws before anything was replied. */

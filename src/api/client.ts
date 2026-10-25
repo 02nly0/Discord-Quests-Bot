@@ -57,13 +57,12 @@ export class DiscordApiClient {
 		this.#trackRateLimit(route, response);
 
 		if (response.status === 429) {
-			const payload = (await response.json().catch(() => null)) as { retry_after?: number } | null;
+			const payload: unknown = await response.json().catch(() => null);
 			// Retrying 429s is capped like every other failure mode. A route
 			// that keeps rate-limiting (or reports retry_after: 0) must not
 			// trap the client in an endless loop.
 			if (attempt + 1 >= MAX_ATTEMPTS) throw new DiscordApiError(429, payload);
-			const retryAfter = payload?.retry_after ?? 1;
-			await sleep(retryAfter * 1000);
+			await sleep(readRetryAfter(payload) * 1000);
 			return this.#request<T>(method, path, body, attempt + 1);
 		}
 
@@ -88,4 +87,9 @@ export class DiscordApiClient {
 			this.#rateLimitedUntil.set(route, Date.now() + Number(resetAfter) * 1000);
 		}
 	}
+}
+
+function readRetryAfter(payload: unknown): number {
+	if (typeof payload !== 'object' || payload === null || !('retry_after' in payload)) return 1;
+	return typeof payload.retry_after === 'number' ? payload.retry_after : 1;
 }

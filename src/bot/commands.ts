@@ -2,7 +2,7 @@ import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 
 export const questsCommand = new SlashCommandBuilder()
 	.setName('quests')
-	.setDescription('Automatically complete your Discord quests')
+	.setDescription('Automatically complete your Discord quests.')
 	.toJSON();
 
 export async function registerCommands(token: string, applicationId: string, guildId?: string): Promise<void> {

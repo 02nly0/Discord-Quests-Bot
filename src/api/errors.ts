@@ -10,10 +10,6 @@ export class DiscordApiError extends Error {
 	detail(): string {
 		if (this.body === null || this.body === undefined) return '';
 		if (typeof this.body === 'string') return this.body;
-		try {
-			return JSON.stringify(this.body);
-		} catch {
-			return String(this.body);
-		}
+		return JSON.stringify(this.body);
 	}
 }

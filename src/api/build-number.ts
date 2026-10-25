@@ -59,21 +59,13 @@ export function extractScriptUrls(html: string, baseUrl: string = APP_URL): stri
 	return urls;
 }
 
-function pathnameOf(url: string): string {
-	try {
-		return new URL(url).pathname;
-	} catch {
-		return url.split('?')[0] ?? url;
-	}
-}
-
 /**
  * Prefers the web/app bundles that carry the build banner. The last script is
  * only used as a fallback when neither of those bundles is present.
  */
 export function selectCandidateScripts(scriptUrls: readonly string[]): string[] {
 	const preferred = scriptUrls.filter((url) => {
-		const pathname = pathnameOf(url);
+		const pathname = new URL(url).pathname;
 		return pathname.includes('/assets/web.') || pathname.includes('/assets/app.');
 	});
 
@@ -111,7 +103,7 @@ export class BuildNumberResolver {
 	#failureLogged = false;
 
 	constructor(options: BuildNumberResolverOptions = {}) {
-		this.#fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+		this.#fetch = options.fetch ?? globalThis.fetch;
 		this.#now = options.now ?? Date.now;
 		this.#fallback = options.fallback ?? FALLBACK_BUILD_NUMBER;
 		this.#appUrl = options.appUrl ?? APP_URL;

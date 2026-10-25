@@ -7,7 +7,7 @@
 export class ThrottledEditor {
 	#lastRunAt = 0;
 	#timer: ReturnType<typeof setTimeout> | null = null;
-	#inFlight: Promise<void> | null = null;
+	#inFlight: Promise<unknown> | null = null;
 	#disposed = false;
 
 	constructor(
@@ -41,15 +41,9 @@ export class ThrottledEditor {
 
 	async #run(): Promise<void> {
 		this.#lastRunAt = Date.now();
-		const update = this.update().then(
-			() => undefined,
-			() => undefined,
-		);
+		const update = this.update().catch(() => undefined);
 		this.#inFlight = update;
-		try {
-			await update;
-		} finally {
-			if (this.#inFlight === update) this.#inFlight = null;
-		}
+		await update;
+		if (this.#inFlight === update) this.#inFlight = null;
 	}
 }
