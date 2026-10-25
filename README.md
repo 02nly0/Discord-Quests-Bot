@@ -1,94 +1,166 @@
+<div align="center">
+
 # Discord Quests Bot
 
-A Discord bot that automatically completes your Discord quests - pick a quest or run all of them with a single click, then claim your rewards.
+**Complete your Discord quests automatically - one click, every reward.**
 
-Built with [Bun](https://bun.sh) and TypeScript. The quest engine (`src/quest`) is fully decoupled from the bot layer, so you can also use it as a library in your own projects.
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Runtime](https://img.shields.io/badge/runtime-Bun-f472b6?logo=bun&logoColor=white)](https://bun.sh)
+[![Language](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Built with](https://img.shields.io/badge/built%20with-discord.js-5865f2?logo=discord&logoColor=white)](https://discord.js.org)
 
-## How it works
+</div>
 
-Discord tracks quest progress server-side through a set of undocumented endpoints normally driven by the desktop client. Given a user token, the bot speaks to those endpoints directly:
+Discord Quests Bot is a self-hosted Discord bot that drives your account's quests to 100% for you. Run `/quests`, paste your token, and pick a single quest or sweep every active one - the bot reports live progress in a channel embed and stops cleanly whenever you tell it to.
 
-1. **Validate** - the token is checked against `GET /users/@me`.
-2. **Fetch** - `GET /quests/@me` lists every active quest on the account.
-3. **Enroll** - `POST /quests/{id}/enroll` opts the account into the quest when needed.
-4. **Progress** - the engine reports activity until the task target is reached:
-   - *Video quests* (`WATCH_VIDEO`, `WATCH_VIDEO_ON_MOBILE`) post a timestamp to `/quests/{id}/video-progress` every 5 seconds.
-   - *Game quests* (`PLAY_ON_DESKTOP`, `PLAY_ON_XBOX`, `PLAY_ON_PLAYSTATION`, `STREAM_ON_DESKTOP`, `PLAY_ACTIVITY`) post `application_id` and `executable_path` to `/quests/{id}/heartbeat` every 30 seconds. Executable paths are resolved from Discord's public application directory and cached per game.
-5. **Finish** - game sessions end with a `terminal: true` heartbeat, matching what the real client sends when a game closes.
+The quest engine lives in its own module with **zero discord.js dependency**, so you can run the bot as-is or embed the engine in your own projects.
 
-The engine handles rate limits (including 429 backoff), transient network retries, stall detection (a game quest that reports no progress for 8 minutes is abandoned and the batch moves on), and graceful cancellation mid-heartbeat.
+---
 
-## Supported quest types
+## ✨ Features
 
-| Task | Method |
-| --- | --- |
-| `WATCH_VIDEO` / `WATCH_VIDEO_ON_MOBILE` | Video progress |
-| `PLAY_ON_DESKTOP` | Heartbeat |
-| `PLAY_ON_XBOX` | Heartbeat |
-| `PLAY_ON_PLAYSTATION` | Heartbeat |
-| `STREAM_ON_DESKTOP` | Heartbeat |
-| `PLAY_ACTIVITY` | Heartbeat |
+- **One-click completion** - finish a single quest from a menu, or press **Complete all** and let the batch run through everything.
+- **Live progress embeds** - a throttled, rate-limit-safe progress bar updates in real time; stop at any moment mid-heartbeat.
+- **Full quest coverage** - video quests (watch trailers) and game quests (desktop, Xbox, PlayStation, streaming, play activity) are all automated.
+- **Production-grade API client** - per-route rate limiting, 429 backoff, transient-failure retries, request timeouts, and typed errors.
+- **Resilient automation** - stall detection abandons quests that stop progressing instead of hanging the batch; one failing quest never blocks the rest.
+- **Private by design** - tokens are validated, held in memory for the session, and dropped when the run ends. Nothing is stored, logged, or sent anywhere but discord.com.
 
-Quests whose tasks fall outside this list are shown in the quest list but skipped by the automation.
+## 🚀 Getting started
 
-## Setup
+### Prerequisites
 
-Requires [Bun](https://bun.sh) v1.1 or newer.
+- [Bun](https://bun.sh) **v1.1+**
+- A Discord application with a bot token (create one in the [developer portal](https://discord.com/developers/applications))
+
+### Installation
 
 ```sh
+git clone https://github.com/DevonNetwork/Discord-Quests-Bot.git
+cd Discord-Quests-Bot
 bun install
-cp .env.example .env   # then fill in DISCORD_TOKEN
 ```
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `DISCORD_TOKEN` | yes | Your bot token from the [developer portal](https://discord.com/developers/applications) |
-| `GUILD_ID` | no | Register commands in one guild for instant availability during development; leave empty for global registration |
+### Configuration
+
+Copy the example environment file and fill in your bot token:
 
 ```sh
-bun run dev     # development, with file watching
-bun run start   # production
-bun run typecheck
+cp .env.example .env
 ```
 
-## Usage
+| Variable    | Required | Description                                                                                          |
+| ----------- | :------: | ---------------------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN` | ✅ | Bot token from the Discord developer portal                                                          |
+| `GUILD_ID`  | ❌ | Register commands in one guild for instant availability during development; leave empty for global registration |
 
-1. Run `/quests` and paste your Discord user token into the modal.
-2. The bot lists your active quests with live progress.
-3. Pick a single quest from the menu, or press **Complete all**.
-4. Watch the progress embed, press **Stop** at any time, and claim your rewards in the Discord client when done.
+### Running
 
-Tokens are validated, kept in memory for the duration of a session, and dropped as soon as the run ends. Nothing is persisted, logged, or sent anywhere other than discord.com.
+```sh
+bun run dev        # development, with file watching
+bun run start      # production
+bun run typecheck  # strict type check
+```
 
-## Project structure
+## 🤖 Usage
+
+1. Run **`/quests`** in any server the bot is in.
+2. Paste your **Discord user token** into the modal.
+3. The bot replies with your active quests and how far along each one is.
+4. Pick a quest from the menu - or press **Complete all**.
+5. Watch the progress embed, press **Stop** whenever you like.
+6. Claim your rewards in the Discord client and enjoy.
+
+> [!NOTE]
+> Rewards are not claimed automatically. When a quest hits 100%, open the Discord client and claim it from your quest page like you normally would.
+
+## ⚙️ How it works
+
+Discord tracks quest progress server-side through undocumented endpoints normally driven by the desktop client. Given a user token, the engine speaks to those endpoints directly:
+
+```mermaid
+flowchart LR
+    A["GET /users/@me\nvalidate token"] --> B["GET /quests/@me\nlist active quests"]
+    B --> C["POST /quests/{id}/enroll\nopt in if needed"]
+    C --> D{Quest type?}
+    D -- video --> E["POST /quests/{id}/video-progress\nevery 5s"]
+    D -- game --> F["POST /quests/{id}/heartbeat\nevery 30s"]
+    E --> G["100%\nterminal heartbeat"]
+    F --> G
+```
+
+- **Video quests** (`WATCH_VIDEO`, `WATCH_VIDEO_ON_MOBILE`) report a timestamp that advances with the wall clock.
+- **Game quests** (`PLAY_ON_DESKTOP`, `PLAY_ON_XBOX`, `PLAY_ON_PLAYSTATION`, `STREAM_ON_DESKTOP`, `PLAY_ACTIVITY`) report an application ID and executable path, resolved from Discord's public application directory and cached per game.
+- **Game sessions end** with a `terminal: true` heartbeat, matching what the real client sends when a game closes.
+
+Quests with tasks outside this list are displayed in the quest list but skipped by the automation.
+
+## 📁 Project structure
 
 ```
 src/
-├── api/                REST client for user-token requests
+├── api/            REST client for user-token requests
 │   ├── client.ts       rate limiting, retries, timeouts
 │   ├── errors.ts       typed API errors
 │   ├── fingerprint.ts  desktop client headers / x-super-properties
 │   └── token.ts        token shape checks and validation
-├── bot/                Discord bot layer (discord.js)
+├── bot/            Discord bot layer (discord.js)
 │   ├── commands.ts     slash command registration
 │   ├── embeds.ts       embed builders for the quest UI
 │   ├── flow.ts         interaction handling and run orchestration
 │   └── registry.ts     per-user setup and run state
-├── quest/              Quest engine - no discord.js dependency
+├── quest/          Quest engine - no discord.js dependency
 │   ├── complete.ts     batch orchestration with hooks
 │   ├── executables.ts  game executable resolution
 │   ├── quest.ts        quest model and progress queries
 │   ├── runner.ts       heartbeat / video-progress loop
 │   └── tasks.ts        supported task registry and pacing
-├── util/               Small shared helpers
-├── config.ts           environment configuration
-└── index.ts            entry point
+├── util/           Small shared helpers
+├── config.ts       environment configuration
+└── index.ts        entry point
 ```
 
-## Disclaimer
+## ❓ FAQ
 
-Automating a user account violates the Discord Terms of Service and can lead to the account being suspended. This project exists for educational purposes - use it at your own risk, ideally on an account you can afford to lose.
+<details>
+<summary><b>Where do I find my Discord user token?</b></summary>
 
-## License
+Open the Discord client, press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> to open developer tools, go to the <b>Network</b> tab, and copy the <code>authorization</code> header value from any request to discord.com.
+</details>
 
-[Apache-2.0](LICENSE)
+<details>
+<summary><b>Is my token safe?</b></summary>
+
+The token is validated against the API, kept in memory only for the duration of your session, and dropped as soon as the run ends. It is never persisted to disk, never logged, and never sent anywhere other than discord.com. The bot needs no database and stores no state.
+</details>
+
+<details>
+<summary><b>Why is a quest skipped?</b></summary>
+
+Only the task types listed above can be automated. Quests that require purchases, in-client clicks, or other unsupported actions are shown in the list but excluded from the batch.
+</details>
+
+<details>
+<summary><b>What happens if a quest gets stuck?</b></summary>
+
+A game quest that reports no progress for 8 minutes is considered stalled, abandoned, and logged in the summary - the rest of the batch keeps running. Repeated API failures fail the individual quest the same way.
+</details>
+
+## 🤝 Contributing
+
+Contributions are welcome! Please open an issue to discuss bigger changes before submitting a pull request.
+
+```sh
+bun install
+bun run typecheck
+```
+
+Make sure the type check passes before you open your PR.
+
+## ⚠️ Disclaimer
+
+Automating a user account violates the [Discord Terms of Service](https://discord.com/terms) and can lead to the account being suspended. This project exists for educational purposes - use it at your own risk, ideally on an account you can afford to lose.
+
+## 📄 License
+
+Distributed under the [Apache-2.0](LICENSE) license.
