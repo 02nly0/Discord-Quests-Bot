@@ -54,6 +54,8 @@ export interface RewardsConfigPayload {
 export interface RewardPayload {
 	id?: string;
 	type?: number;
+	asset?: string;
+	asset_video?: string;
 	orb_quantity?: number;
 	premium_orb_quantity?: number;
 	messages?: { name?: string; name_plural?: string };

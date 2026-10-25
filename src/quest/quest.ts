@@ -17,6 +17,7 @@ export interface QuestReward {
 	type: number | null;
 	orbs: number;
 	premiumOrbs: number;
+	imageUrl: string | null;
 }
 
 function positiveNumber(value: number | undefined): number {
@@ -73,6 +74,7 @@ export class Quest {
 				type: reward.type ?? null,
 				orbs,
 				premiumOrbs: positiveNumber(reward.premium_orb_quantity) || orbs,
+				imageUrl: this.assetUrl(reward.asset),
 			};
 		});
 	}

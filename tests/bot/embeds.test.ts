@@ -84,6 +84,34 @@ describe('questEmbed', () => {
 		expect(embed.image?.url).toBe('https://cdn.discordapp.com/quests/hero.png');
 	});
 
+	it('prefers the reward art as the thumbnail', () => {
+		const embed = questEmbed(
+			quest('a', {
+				assets: { game_tile: 'quests/tile.png' },
+				rewards_config: {
+					rewards: [{ type: 3, asset: 'headgear.png', messages: { name: 'Headgear' } }],
+				},
+			}),
+			0,
+			1,
+		).toJSON();
+
+		expect(embed.thumbnail?.url).toBe('https://cdn.discordapp.com/quests/a/headgear.png');
+	});
+
+	it('falls back to the game art when the reward has no image', () => {
+		const embed = questEmbed(
+			quest('a', {
+				assets: { game_tile: 'quests/tile.png' },
+				rewards_config: { rewards: [{ type: 4, orb_quantity: 1000, messages: { name: '1,000 Orbs' } }] },
+			}),
+			0,
+			1,
+		).toJSON();
+
+		expect(embed.thumbnail?.url).toBe('https://cdn.discordapp.com/quests/tile.png');
+	});
+
 	it('does not try to render a video hero as a banner', () => {
 		const embed = questEmbed(quest('a', { assets: { hero: 'quests/hero.mp4' } }), 0, 1).toJSON();
 		expect(embed.image).toBeUndefined();

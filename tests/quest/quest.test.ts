@@ -113,12 +113,12 @@ describe('Quest rewards', () => {
 		);
 
 		expect(quest.rewardName).toBe('1,000 Orbs');
-		expect(quest.rewards[0]).toEqual({ name: '1,000 Orbs', type: 4, orbs: 1000, premiumOrbs: 1200 });
+		expect(quest.rewards[0]).toEqual({ name: '1,000 Orbs', type: 4, orbs: 1000, premiumOrbs: 1200, imageUrl: null });
 	});
 
 	it('falls back to the base payout when Discord sends no Nitro figure', () => {
 		const quest = new Quest(questPayload({ config: { rewards_config: { rewards: [{ type: 4, orb_quantity: 500 }] } } }));
-		expect(quest.rewards[0]).toEqual({ name: 'Unknown reward', type: 4, orbs: 500, premiumOrbs: 500 });
+		expect(quest.rewards[0]).toEqual({ name: 'Unknown reward', type: 4, orbs: 500, premiumOrbs: 500, imageUrl: null });
 	});
 
 	it('keeps rewards that pay no orbs', () => {
@@ -127,7 +127,24 @@ describe('Quest rewards', () => {
 				config: { rewards_config: { rewards: [{ type: 3, messages: { name: 'Avatar Decoration' } }] } },
 			}),
 		);
-		expect(quest.rewards[0]).toEqual({ name: 'Avatar Decoration', type: 3, orbs: 0, premiumOrbs: 0 });
+		expect(quest.rewards[0]).toEqual({
+			name: 'Avatar Decoration',
+			type: 3,
+			orbs: 0,
+			premiumOrbs: 0,
+			imageUrl: null,
+		});
+	});
+
+	it('resolves the reward art under the quest id', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					rewards_config: { rewards: [{ type: 3, asset: 'headgear.png', messages: { name: 'Headgear' } }] },
+				},
+			}),
+		);
+		expect(quest.rewards[0].imageUrl).toBe('https://cdn.discordapp.com/quests/q1/headgear.png');
 	});
 });
 

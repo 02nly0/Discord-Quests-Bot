@@ -56,7 +56,8 @@ export function questEmbed(quest: Quest, index: number, total: number): EmbedBui
 		embed.setDescription('This quest cannot be completed automatically.');
 	}
 
-	const thumbnail = quest.tileUrl ?? quest.logotypeUrl;
+	const rewardImage = quest.rewards.find((reward) => reward.imageUrl && IMAGE_ASSET.test(reward.imageUrl))?.imageUrl;
+	const thumbnail = rewardImage ?? quest.tileUrl ?? quest.logotypeUrl;
 	if (thumbnail) embed.setThumbnail(thumbnail);
 
 	const hero = quest.heroUrl;
