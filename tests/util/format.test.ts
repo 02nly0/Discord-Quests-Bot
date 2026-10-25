@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { describeError, progressBar, truncate } from './format';
+import { describeError, progressBar, truncate } from '../../src/util/format';
 
 describe('progressBar', () => {
 	it('fills proportionally to the percentage', () => {

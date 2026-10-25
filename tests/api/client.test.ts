@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { DiscordApiClient } from './client';
-import { DiscordApiError } from './errors';
+import { DiscordApiClient } from '../../src/api/client';
+import { DiscordApiError } from '../../src/api/errors';
 
 /**
  * The client is tested by stubbing globalThis.fetch with a scripted queue of

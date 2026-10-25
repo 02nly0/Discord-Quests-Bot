@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { Quest } from '../quest';
+import { Quest } from '../../src/quest';
 import {
 	errorEmbed,
 	invalidTokenEmbed,
@@ -7,8 +7,8 @@ import {
 	questListEmbed,
 	summaryEmbed,
 	type AutomationSnapshot,
-} from './embeds';
-import type { QuestBatchResult } from '../quest';
+} from '../../src/bot/embeds';
+import type { QuestBatchResult } from '../../src/quest';
 
 function quest(id: string): Quest {
 	return new Quest({

@@ -120,13 +120,21 @@ src/
 │   ├── quest.ts        quest model and progress queries
 │   ├── runner.ts       heartbeat / video-progress loop
 │   └── tasks.ts        supported task registry and pacing
-├── testing/        Shared test helpers (scripted API client)
 ├── util/           Small shared helpers
 ├── config.ts       environment configuration
 └── index.ts        entry point
+
+tests/
+├── api/            mirrors src/api
+├── bot/            mirrors src/bot
+├── quest/          mirrors src/quest
+├── testing/        shared test infrastructure (scripted API client)
+├── util/           mirrors src/util
+└── config.test.ts
 ```
 
-Unit tests sit next to the code as `*.test.ts` and run with `bun test`.
+Tests live in `tests/` at the repository root and mirror the source layout, so
+`src/` stays focused on runtime code. Run them with `bun test`.
 
 ## ❓ FAQ
 

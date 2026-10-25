@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { formatDuration, formatElapsed, sleep } from './time';
+import { formatDuration, formatElapsed, sleep } from '../../src/util/time';
 
 describe('formatDuration', () => {
 	it('formats hour spans without seconds', () => {

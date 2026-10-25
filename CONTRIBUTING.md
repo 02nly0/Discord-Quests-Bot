@@ -53,9 +53,10 @@ CI runs the same typecheck, lint, and test steps on every push and pull request.
   choice was made, not restate what the line does.
 - **Keep tokens out of logs and errors.** `DiscordApiError` deliberately does
   not include the request headers or token; do not add them.
-- **Add a test with behaviour changes.** Tests live next to the code as
-  `*.test.ts`. Use `src/testing/fake-client.ts` for engine tests instead of
-  hitting the network.
+- **Add a test with behaviour changes.** Tests live under `tests/` at the
+  repository root, in a folder tree that mirrors the source layout. Use
+  `tests/testing/fake-client.ts` for engine tests instead of hitting the
+  network.
 
 ## Commits and pull requests
 

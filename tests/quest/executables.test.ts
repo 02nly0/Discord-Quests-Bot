@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeApiClient } from '../testing/fake-client';
-import { resolveExecutablePath } from './executables';
+import { resolveExecutablePath } from '../../src/quest/executables';
 
 /**
  * The executable cache is a module-level Map, so every test uses its own

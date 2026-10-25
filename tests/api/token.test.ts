@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import type { DiscordApiClient } from './client';
-import { cleanToken, fetchCurrentUser, isTokenShaped } from './token';
+import type { DiscordApiClient } from '../../src/api/client';
+import { cleanToken, fetchCurrentUser, isTokenShaped } from '../../src/api/token';
 
 /** Builds a client stub whose GET resolves to whatever the factory returns. */
 function clientReturning(get: () => unknown): DiscordApiClient {

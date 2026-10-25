@@ -1,4 +1,4 @@
-import type { DiscordApiClient } from '../api/client';
+import type { DiscordApiClient } from '../../src/api/client';
 
 export type RouteHandler = (call: { path: string; body?: unknown }) => unknown;
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { loadConfig } from './config';
+import { loadConfig } from '../src/config';
 
 const originalToken = process.env.DISCORD_TOKEN;
 const originalGuildId = process.env.GUILD_ID;

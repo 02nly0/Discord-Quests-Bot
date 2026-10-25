@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { isSupportedTask, isVideoTask, SUPPORTED_TASKS } from './tasks';
+import { isSupportedTask, isVideoTask, SUPPORTED_TASKS } from '../../src/quest/tasks';
 
 describe('isSupportedTask', () => {
 	it('recognizes every task in SUPPORTED_TASKS', () => {

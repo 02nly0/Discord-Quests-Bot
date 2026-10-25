@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildHeaders } from './fingerprint';
+import { buildHeaders } from '../../src/api/fingerprint';
 
 describe('buildHeaders', () => {
 	it('authenticates with the user token and identifies as the desktop client', () => {

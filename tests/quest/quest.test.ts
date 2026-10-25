@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { Quest } from './quest';
-import type { QuestPayload } from './types';
+import { Quest } from '../../src/quest/quest';
+import type { QuestPayload } from '../../src/quest/types';
 
 function questPayload(overrides?: {
 	config?: Partial<QuestPayload['config']>;

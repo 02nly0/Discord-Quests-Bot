@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { sleep } from './time';
-import { ThrottledEditor } from './throttle';
+import { sleep } from '../../src/util/time';
+import { ThrottledEditor } from '../../src/util/throttle';
 
 describe('ThrottledEditor', () => {
 	it('coalesces a burst of requests into a single run that sees the latest state', async () => {

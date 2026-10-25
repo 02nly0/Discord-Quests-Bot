@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeApiClient } from '../testing/fake-client';
-import { completeQuests } from './complete';
-import { Quest } from './quest';
-import type { QuestBatchHooks, QuestBatchResult } from './complete';
-import type { QuestPayload } from './types';
+import { completeQuests } from '../../src/quest/complete';
+import { Quest } from '../../src/quest/quest';
+import type { QuestBatchHooks, QuestBatchResult } from '../../src/quest/complete';
+import type { QuestPayload } from '../../src/quest/types';
 
 function questPayload(id: string, options?: { task?: string; target?: number; complete?: boolean }): QuestPayload {
 	return {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeApiClient } from '../testing/fake-client';
-import { automatableQuests, fetchQuests } from './facade';
-import { Quest } from './quest';
-import type { QuestPayload } from './types';
+import { automatableQuests, fetchQuests } from '../../src/quest/facade';
+import { Quest } from '../../src/quest/quest';
+import type { QuestPayload } from '../../src/quest/types';
 
 function payload(id: string, options?: { expired?: boolean; completed?: boolean; task?: string }): QuestPayload {
 	return {

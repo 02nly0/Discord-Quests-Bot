@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { fakeApiClient } from '../testing/fake-client';
-import { Quest } from './quest';
-import { runQuest } from './runner';
-import type { QuestPayload } from './types';
+import { Quest } from '../../src/quest/quest';
+import { runQuest } from '../../src/quest/runner';
+import type { QuestPayload } from '../../src/quest/types';
 
 /**
  * runQuest is exercised against the scripted fake client. Quests are built to
