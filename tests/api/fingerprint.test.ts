@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { buildHeaders } from '../../src/api/fingerprint';
 
+function decodeSuperProperties(headers: Record<string, string>): Record<string, unknown> {
+	return JSON.parse(Buffer.from(headers['x-super-properties'], 'base64').toString('utf8'));
+}
+
 describe('buildHeaders', () => {
 	it('authenticates with the user token and identifies as the desktop client', () => {
 		const headers = buildHeaders('abc.def.ghi', 649389);
@@ -14,11 +18,8 @@ describe('buildHeaders', () => {
 	});
 
 	it('encodes a well-formed x-super-properties payload', () => {
-		const headers = buildHeaders('abc.def.ghi', 654321);
-		const encoded = headers['x-super-properties'];
-		expect(encoded).toBeString();
+		const properties = decodeSuperProperties(buildHeaders('abc.def.ghi', 654321));
 
-		const properties: Record<string, unknown> = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
 		expect(properties).toMatchObject({
 			os: 'Windows',
 			browser: 'Discord Client',
@@ -28,5 +29,15 @@ describe('buildHeaders', () => {
 			browser_version: '152.0.7977.167',
 		});
 		expect(typeof properties.client_build_number).toBe('number');
+		expect(typeof properties.client_launch_id).toBe('string');
+	});
+
+	it('reuses the client launch and heartbeat session IDs for the whole process', () => {
+		const first = decodeSuperProperties(buildHeaders('token1', 654321));
+		const second = decodeSuperProperties(buildHeaders('token2', 654321));
+
+		expect(first.client_launch_id).toBe(second.client_launch_id);
+		expect(first.client_heartbeat_session_id).toBe(second.client_heartbeat_session_id);
+		expect(first.client_heartbeat_session_id).toBeString();
 	});
 });

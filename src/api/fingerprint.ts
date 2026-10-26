@@ -19,6 +19,10 @@ const USER_AGENT =
 	'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
 	`discord/${CLIENT_VERSION} Chrome/${CHROME_VERSION} Electron/${ELECTRON_VERSION} Safari/537.36`;
 
+// Generated once per process so every request looks like it comes from one
+// running desktop client instead of a fresh launch on every request.
+const CLIENT_SESSION_ID = crypto.randomUUID();
+
 function encodeSuperProperties(buildNumber: number): string {
 	const properties = {
 		os: 'Windows',
@@ -36,9 +40,9 @@ function encodeSuperProperties(buildNumber: number): string {
 		release_channel: 'stable',
 		client_build_number: buildNumber,
 		client_event_source: null,
-		client_launch_id: crypto.randomUUID(),
+		client_launch_id: CLIENT_SESSION_ID,
 		client_app_state: 'focused',
-		client_heartbeat_session_id: crypto.randomUUID(),
+		client_heartbeat_session_id: CLIENT_SESSION_ID,
 	};
 
 	return Buffer.from(JSON.stringify(properties)).toString('base64');
