@@ -58,12 +58,16 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 	}
 }
 
-async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
-	const parts = interaction.customId.split(':');
-	const action = parts[1];
-	const ownerId = parts[2] ?? interaction.message.interactionMetadata?.user.id;
+/** Ownership is carried in the custom ID so the check does not depend on setup state. */
+export function isButtonOwner(customId: string, userId: string, messageOwnerId?: string): boolean {
+	const ownerId = customId.split(':')[2] ?? messageOwnerId;
+	return ownerId === undefined || ownerId === userId;
+}
 
-	if (ownerId && interaction.user.id !== ownerId) {
+async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
+	const action = interaction.customId.split(':')[1];
+
+	if (!isButtonOwner(interaction.customId, interaction.user.id, interaction.message.interactionMetadata?.user.id)) {
 		await interaction.reply({
 			content: 'This menu belongs to someone else. Run `/quests` to start your own session.',
 			ephemeral: true,
@@ -83,6 +87,8 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 		await startRun(interaction, null);
 	} else if (action === 'stop') {
 		await stopRun(interaction);
+	} else {
+		await interaction.reply({ content: 'That button is no longer available. Run `/quests` again.', ephemeral: true });
 	}
 }
 

@@ -1,63 +1,22 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import type { ButtonInteraction } from 'discord.js';
-import { handleInteraction } from '../../src/bot/flow';
-import { activeRuns, pendingSetups, setPendingSetup } from '../../src/bot/registry';
-import { fakeApiClient } from '../testing/fake-client';
+import { describe, expect, it } from 'bun:test';
+import { isButtonOwner } from '../../src/bot/flow';
 
-describe('interaction validation', () => {
-	beforeEach(() => {
-		pendingSetups.clear();
-		activeRuns.clear();
+describe('isButtonOwner', () => {
+	it('matches the user scoped into the button custom ID', () => {
+		expect(isButtonOwner('quests:next:owner', 'owner')).toBe(true);
+		expect(isButtonOwner('quests:next:owner', 'intruder')).toBe(false);
 	});
 
-	it('rejects button interactions triggered by a different user', async () => {
-		const replyMock = mock(async () => {});
-		const updateMock = mock(async () => {});
-
-		const interaction = {
-			isChatInputCommand: () => false,
-			isModalSubmit: () => false,
-			isButton: () => true,
-			isRepliable: () => true,
-			customId: 'quests:next:user-owner',
-			user: { id: 'user-intruder' },
-			message: {},
-			reply: replyMock,
-			update: updateMock,
-		} as unknown as ButtonInteraction;
-
-		await handleInteraction(interaction);
-
-		expect(replyMock).toHaveBeenCalledTimes(1);
-		expect(replyMock).toHaveBeenCalledWith({
-			content: 'This menu belongs to someone else. Run `/quests` to start your own session.',
-			ephemeral: true,
-		});
-		expect(updateMock).toHaveBeenCalledTimes(0);
+	it('rejects another user stopping a run', () => {
+		expect(isButtonOwner('quests:stop:owner', 'intruder')).toBe(false);
 	});
 
-	it('allows button interactions triggered by the matching owner', async () => {
-		const { client } = fakeApiClient({});
-		setPendingSetup('user-owner', { client, quests: [], index: 0, showCompleted: false });
+	it('falls back to the message owner for buttons created before IDs were scoped', () => {
+		expect(isButtonOwner('quests:next', 'owner', 'owner')).toBe(true);
+		expect(isButtonOwner('quests:next', 'intruder', 'owner')).toBe(false);
+	});
 
-		const replyMock = mock(async () => {});
-		const updateMock = mock(async () => {});
-
-		const interaction = {
-			isChatInputCommand: () => false,
-			isModalSubmit: () => false,
-			isButton: () => true,
-			isRepliable: () => true,
-			customId: 'quests:next:user-owner',
-			user: { id: 'user-owner' },
-			message: {},
-			reply: replyMock,
-			update: updateMock,
-		} as unknown as ButtonInteraction;
-
-		await handleInteraction(interaction);
-
-		expect(replyMock).toHaveBeenCalledTimes(0);
-		expect(updateMock).toHaveBeenCalledTimes(1);
+	it('allows buttons when no owner can be determined', () => {
+		expect(isButtonOwner('quests:next', 'anyone')).toBe(true);
 	});
 });

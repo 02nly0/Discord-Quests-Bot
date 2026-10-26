@@ -16,9 +16,10 @@ export interface ActiveRun {
 export const SETUP_TTL_MS = 15 * 60 * 1000;
 
 /**
- * Per-user state, keyed by the Discord user who triggered it. Because every
- * lookup is keyed by the interacting user, ownership checks fall out of the
- * map itself, so a user can only ever reach their own setup or run.
+ * Per-user state, keyed by the Discord user who triggered it. Every lookup is
+ * keyed by the interacting user, and the bot layer verifies button ownership
+ * before mutating anything here, so a user can only reach their own setup or
+ * run.
  */
 export const pendingSetups = new Map<string, PendingSetup>();
 export const activeRuns = new Map<string, ActiveRun>();
@@ -62,12 +63,5 @@ let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 export function startSetupCleanup(intervalMs = 60_000): void {
 	if (cleanupTimer) return;
 	cleanupTimer = setInterval(() => cleanExpiredSetups(), intervalMs);
-	cleanupTimer.unref?.();
-}
-
-export function stopSetupCleanup(): void {
-	if (cleanupTimer) {
-		clearInterval(cleanupTimer);
-		cleanupTimer = null;
-	}
+	cleanupTimer.unref();
 }

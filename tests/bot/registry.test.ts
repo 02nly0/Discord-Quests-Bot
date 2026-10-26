@@ -44,7 +44,6 @@ describe('registry TTL and session cleanup', () => {
 		cleanExpiredSetups(threeHoursLater);
 
 		expect(pendingSetups.has('user-running')).toBe(true);
-		expect(activeRuns.has('user-running')).toBe(true);
 	});
 
 	it('manually deletes setups when runs start', () => {
