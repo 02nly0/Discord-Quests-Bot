@@ -49,22 +49,40 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 			await showTokenModal(interaction);
 		} else if (interaction.isModalSubmit() && interaction.customId === MODAL_ID) {
 			await beginQuestSetup(interaction);
-		} else if (interaction.isButton() && interaction.customId === PREV_ID) {
-			await browseQuests(interaction, -1);
-		} else if (interaction.isButton() && interaction.customId === NEXT_ID) {
-			await browseQuests(interaction, 1);
-		} else if (interaction.isButton() && interaction.customId === CONFIRM_ID) {
-			await confirmQuest(interaction);
-		} else if (interaction.isButton() && interaction.customId === TOGGLE_COMPLETED_ID) {
-			await toggleCompleted(interaction);
-		} else if (interaction.isButton() && interaction.customId === COMPLETE_ALL_ID) {
-			await startRun(interaction, null);
-		} else if (interaction.isButton() && interaction.customId === STOP_ID) {
-			await stopRun(interaction);
+		} else if (interaction.isButton() && interaction.customId.startsWith('quests:')) {
+			await handleButtonInteraction(interaction);
 		}
 	} catch (error) {
 		log('bot', `interaction failed: ${describeError(error)}`);
 		await recoverInteraction(interaction, 'Something went wrong while handling that. Please try again.');
+	}
+}
+
+async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
+	const parts = interaction.customId.split(':');
+	const action = parts[1];
+	const ownerId = parts[2] ?? interaction.message.interactionMetadata?.user.id;
+
+	if (ownerId && interaction.user.id !== ownerId) {
+		await interaction.reply({
+			content: 'This menu belongs to someone else. Run `/quests` to start your own session.',
+			ephemeral: true,
+		});
+		return;
+	}
+
+	if (action === 'prev') {
+		await browseQuests(interaction, -1);
+	} else if (action === 'next') {
+		await browseQuests(interaction, 1);
+	} else if (action === 'confirm') {
+		await confirmQuest(interaction);
+	} else if (action === 'toggle-completed') {
+		await toggleCompleted(interaction);
+	} else if (action === 'complete-all') {
+		await startRun(interaction, null);
+	} else if (action === 'stop') {
+		await stopRun(interaction);
 	}
 }
 
@@ -105,7 +123,7 @@ async function beginQuestSetup(interaction: ModalSubmitInteraction): Promise<voi
 	}
 
 	const setup = setPendingSetup(interaction.user.id, { client, quests, index: 0, showCompleted: false });
-	await interaction.editReply(setupView(setup));
+	await interaction.editReply(setupView(setup, interaction.user.id));
 }
 
 /**
@@ -121,46 +139,46 @@ function visibleQuests(setup: PendingSetup): Quest[] {
 	return setup.showCompleted ? ordered : ordered.filter((quest) => !quest.isCompleted);
 }
 
-function setupView(setup: PendingSetup) {
+function setupView(setup: PendingSetup, userId: string) {
 	const quests = visibleQuests(setup);
 	const quest = quests[setup.index];
 	return {
 		embeds: [quest ? questEmbed(quest, setup.index, quests.length) : noQuestsEmbed()],
-		components: questRows(setup, quests),
+		components: questRows(setup, quests, userId),
 	};
 }
 
-function questRows(setup: PendingSetup, quests: Quest[]): ActionRowBuilder<ButtonBuilder>[] {
+function questRows(setup: PendingSetup, quests: Quest[], userId: string): ActionRowBuilder<ButtonBuilder>[] {
 	const quest = quests[setup.index];
 	const completed = setup.quests.filter((item) => item.isCompleted).length;
 	const canBrowse = quests.length > 1;
 
 	const back = new ButtonBuilder()
-		.setCustomId(PREV_ID)
+		.setCustomId(`${PREV_ID}:${userId}`)
 		.setLabel('Back')
 		.setStyle(ButtonStyle.Secondary)
 		.setDisabled(!canBrowse);
 
 	const confirm = new ButtonBuilder()
-		.setCustomId(CONFIRM_ID)
+		.setCustomId(`${CONFIRM_ID}:${userId}`)
 		.setLabel('Confirm')
 		.setStyle(ButtonStyle.Success)
 		.setDisabled(!quest?.isAutomatable);
 
 	const next = new ButtonBuilder()
-		.setCustomId(NEXT_ID)
+		.setCustomId(`${NEXT_ID}:${userId}`)
 		.setLabel('Next')
 		.setStyle(ButtonStyle.Secondary)
 		.setDisabled(!canBrowse);
 
 	const toggle = new ButtonBuilder()
-		.setCustomId(TOGGLE_COMPLETED_ID)
+		.setCustomId(`${TOGGLE_COMPLETED_ID}:${userId}`)
 		.setLabel(`${setup.showCompleted ? 'Hide' : 'Show'} completed${completed > 0 ? ` (${completed})` : ''}`)
 		.setStyle(setup.showCompleted ? ButtonStyle.Primary : ButtonStyle.Secondary)
 		.setDisabled(completed === 0);
 
 	const completeAll = new ButtonBuilder()
-		.setCustomId(COMPLETE_ALL_ID)
+		.setCustomId(`${COMPLETE_ALL_ID}:${userId}`)
 		.setLabel('Complete all quests')
 		.setStyle(ButtonStyle.Secondary)
 		.setDisabled(automatableQuests(setup.quests).length === 0);
@@ -182,7 +200,7 @@ async function browseQuests(interaction: ButtonInteraction, step: number): Promi
 	if (quests.length > 0) {
 		setup.index = (setup.index + step + quests.length) % quests.length;
 	}
-	await interaction.update(setupView(setup));
+	await interaction.update(setupView(setup, interaction.user.id));
 }
 
 async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
@@ -195,7 +213,7 @@ async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
 	setup.showCompleted = !setup.showCompleted;
 	const quests = visibleQuests(setup);
 	setup.index = Math.min(setup.index, Math.max(0, quests.length - 1));
-	await interaction.update(setupView(setup));
+	await interaction.update(setupView(setup, interaction.user.id));
 }
 
 async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
@@ -278,10 +296,10 @@ async function runBatch(
 	const message = interaction.message;
 
 	try {
-		await interaction.update({ embeds: [progressEmbed(snapshot)], components: [stopRow()] });
+		await interaction.update({ embeds: [progressEmbed(snapshot)], components: [stopRow(interaction.user.id)] });
 
 		refresh = new ThrottledEditor(
-			() => message.edit({ embeds: [progressEmbed(snapshot)], components: [stopRow()] }),
+			() => message.edit({ embeds: [progressEmbed(snapshot)], components: [stopRow(interaction.user.id)] }),
 			PROGRESS_EDIT_INTERVAL_MS,
 		);
 
@@ -330,8 +348,8 @@ async function runBatch(
 	}
 }
 
-function stopRow(): ActionRowBuilder<ButtonBuilder> {
-	const stop = new ButtonBuilder().setCustomId(STOP_ID).setLabel('Stop').setStyle(ButtonStyle.Danger);
+function stopRow(userId: string): ActionRowBuilder<ButtonBuilder> {
+	const stop = new ButtonBuilder().setCustomId(`${STOP_ID}:${userId}`).setLabel('Stop').setStyle(ButtonStyle.Danger);
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(stop);
 }
 
