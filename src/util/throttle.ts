@@ -46,8 +46,6 @@ export class ThrottledEditor {
 	}
 
 	async #run(): Promise<void> {
-		if (this.#disposed) return;
-
 		this.#pending = false;
 		this.#lastRunAt = Date.now();
 		const update = this.update().catch(() => undefined);
