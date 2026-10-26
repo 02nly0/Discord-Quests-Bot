@@ -1,13 +1,13 @@
 /**
  * Coalesces rapid update requests into edits spaced at least `minIntervalMs`
- * apart. While a run is pending, later requests are absorbed into it and the
- * run always reads the latest state, so no update is ever lost and no burst
- * ever produces more runs than the interval allows.
+ * apart. Ensures in-flight edits are never run concurrently, serializing trailing
+ * updates and guaranteeing clean disposal.
  */
 export class ThrottledEditor {
 	#lastRunAt = 0;
 	#timer: ReturnType<typeof setTimeout> | null = null;
 	#inFlight: Promise<unknown> | null = null;
+	#pending = false;
 	#disposed = false;
 
 	constructor(
@@ -16,7 +16,12 @@ export class ThrottledEditor {
 	) {}
 
 	request(): void {
-		if (this.#disposed || this.#timer) return;
+		if (this.#disposed) return;
+
+		if (this.#inFlight || this.#timer) {
+			this.#pending = true;
+			return;
+		}
 
 		const wait = Math.max(0, this.minIntervalMs - (Date.now() - this.#lastRunAt));
 		this.#timer = setTimeout(() => {
@@ -32,6 +37,7 @@ export class ThrottledEditor {
 	 */
 	async dispose(): Promise<void> {
 		this.#disposed = true;
+		this.#pending = false;
 		if (this.#timer) {
 			clearTimeout(this.#timer);
 			this.#timer = null;
@@ -40,10 +46,17 @@ export class ThrottledEditor {
 	}
 
 	async #run(): Promise<void> {
+		if (this.#disposed) return;
+
+		this.#pending = false;
 		this.#lastRunAt = Date.now();
 		const update = this.update().catch(() => undefined);
 		this.#inFlight = update;
 		await update;
 		if (this.#inFlight === update) this.#inFlight = null;
+
+		if (this.#pending && !this.#disposed) {
+			this.request();
+		}
 	}
 }

@@ -104,4 +104,24 @@ describe('ThrottledEditor', () => {
 		await disposal;
 		expect(updateFinished).toBe(true);
 	});
+
+	it('never executes updates concurrently when updates take longer than minIntervalMs', async () => {
+		let concurrent = 0;
+		let maxConcurrent = 0;
+		const editor = new ThrottledEditor(async () => {
+			concurrent += 1;
+			maxConcurrent = Math.max(maxConcurrent, concurrent);
+			await sleep(50);
+			concurrent -= 1;
+		}, 20);
+
+		editor.request();
+		await sleep(10);
+		editor.request();
+		await sleep(10);
+		editor.request();
+		await sleep(200);
+
+		expect(maxConcurrent).toBe(1);
+	});
 });
