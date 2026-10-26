@@ -1,0 +1,354 @@
+import { describe, expect, it } from 'bun:test';
+import { Quest } from '../../src/quest/quest';
+import type { QuestPayload } from '../../src/quest/types';
+
+function questPayload(overrides?: {
+	config?: Partial<QuestPayload['config']>;
+	userStatus?: QuestPayload['user_status'];
+	id?: string;
+}): QuestPayload {
+	return {
+		id: overrides?.id ?? 'q1',
+		config: {
+			application_id: 'app1',
+			application: { id: 'app1', name: 'Test Game' },
+			messages: { quest_name: 'Play for 10 minutes', game_title: 'Test Game' },
+			task_config_v2: { tasks: { PLAY_ACTIVITY: { target: 600 } } },
+			expires_at: '2099-01-01T00:00:00.000Z',
+			...overrides?.config,
+		},
+		user_status: overrides?.userStatus,
+	};
+}
+
+describe('Quest display names', () => {
+	it('combines game title and quest name', () => {
+		expect(new Quest(questPayload()).displayName).toBe('Test Game: Play for 10 minutes');
+	});
+
+	it('falls back to the quest name alone when the game title is missing', () => {
+		const payload = questPayload({ config: { messages: { quest_name: 'Just a quest' } } });
+		expect(new Quest(payload).displayName).toBe('Just a quest');
+	});
+
+	it('substitutes a placeholder when the quest name is missing', () => {
+		const payload = questPayload({ config: { messages: undefined } });
+		expect(new Quest(payload).questName).toBe('Unknown quest');
+	});
+});
+
+describe('Quest status flags', () => {
+	it('derives enrollment and completion from user_status', () => {
+		const payload = questPayload({
+			userStatus: { enrolled_at: '2026-10-01T00:00:00.000Z', completed_at: '2026-10-02T00:00:00.000Z' },
+		});
+		const quest = new Quest(payload);
+
+		expect(quest.isEnrolled).toBe(true);
+		expect(quest.isCompleted).toBe(true);
+	});
+
+	it('treats missing user_status as not enrolled and not completed', () => {
+		const quest = new Quest(questPayload());
+		expect(quest.isEnrolled).toBe(false);
+		expect(quest.isCompleted).toBe(false);
+	});
+
+	it('detects expiry from expires_at', () => {
+		const expired = new Quest(questPayload({ config: { expires_at: '2000-01-01T00:00:00.000Z' } }));
+		const active = new Quest(questPayload());
+		const unparseable = new Quest(questPayload({ config: { expires_at: 'nonsense' } }));
+
+		expect(expired.isExpired).toBe(true);
+		expect(active.isExpired).toBe(false);
+		expect(unparseable.expiresAt).toBeNull();
+		expect(unparseable.isExpired).toBe(false);
+	});
+
+	it('reads the reward claim deadline', () => {
+		const quest = new Quest(
+			questPayload({ config: { rewards_config: { rewards_expire_at: '2026-11-05T00:00:00.000Z' } } }),
+		);
+		expect(quest.rewardsExpireAt?.toISOString()).toBe('2026-11-05T00:00:00.000Z');
+		expect(new Quest(questPayload()).rewardsExpireAt).toBeNull();
+	});
+
+	it('is automatable only while incomplete and supported', () => {
+		const fresh = new Quest(questPayload());
+		const completed = new Quest(questPayload({ userStatus: { completed_at: '2026-10-02T00:00:00.000Z' } }));
+		const unsupported = new Quest(
+			questPayload({ config: { task_config_v2: { tasks: { DO_THE_DISHES: { target: 5 } } } } }),
+		);
+
+		expect(fresh.isAutomatable).toBe(true);
+		expect(completed.isAutomatable).toBe(false);
+		expect(unsupported.isAutomatable).toBe(false);
+	});
+});
+
+describe('Quest.tileUrl', () => {
+	it('prefixes cdn.discordapp.com to quest-rooted paths', () => {
+		const quest = new Quest(questPayload({ config: { assets: { game_tile: 'quests/abc.png' } } }));
+		expect(quest.tileUrl).toBe('https://cdn.discordapp.com/quests/abc.png');
+	});
+
+	it('scopes bare paths under the quest id', () => {
+		const quest = new Quest(questPayload({ config: { assets: { game_tile: 'abc.png' } } }));
+		expect(quest.tileUrl).toBe('https://cdn.discordapp.com/quests/q1/abc.png');
+	});
+
+	it('returns null when there are no assets', () => {
+		expect(new Quest(questPayload()).tileUrl).toBeNull();
+	});
+
+	it('resolves hero and logotype assets the same way', () => {
+		const quest = new Quest(questPayload({ config: { assets: { hero: 'hero.png', logotype: 'quests/abc/logo.png' } } }));
+		expect(quest.heroUrl).toBe('https://cdn.discordapp.com/quests/q1/hero.png');
+		expect(quest.logotypeUrl).toBe('https://cdn.discordapp.com/quests/abc/logo.png');
+	});
+
+	it('skips placeholder art and prefers the published tile variant', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					assets: {
+						game_tile: 'PLACEHOLDER',
+						logotype: 'PLACEHOLDER',
+						game_tile_dark: 'quests/q1/tile-dark.png',
+						game_tile_light: 'quests/q1/tile-light.png',
+						logotype_light: 'quests/q1/logo-light.png',
+					},
+				},
+			}),
+		);
+
+		expect(quest.tileUrl).toBe('https://cdn.discordapp.com/quests/q1/tile-light.png');
+		expect(quest.logotypeUrl).toBe('https://cdn.discordapp.com/quests/q1/logo-light.png');
+	});
+
+	it('ignores art with a non-image extension', () => {
+		const quest = new Quest(
+			questPayload({ config: { assets: { hero: 'hero.mp4', quest_bar_hero: 'quests/q1/bar.jpg' } } }),
+		);
+		expect(quest.heroUrl).toBe('https://cdn.discordapp.com/quests/q1/bar.jpg');
+	});
+});
+
+describe('Quest rewards', () => {
+	it('reads the orb payout and its Nitro figure', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					rewards_config: {
+						rewards: [{ type: 4, orb_quantity: 1000, premium_orb_quantity: 1200, messages: { name: '1,000 Orbs' } }],
+					},
+				},
+			}),
+		);
+
+		expect(quest.rewardName).toBe('1,000 Orbs');
+		expect(quest.rewards[0]).toEqual({ name: '1,000 Orbs', type: 4, orbs: 1000, premiumOrbs: 1200, imageUrl: null });
+	});
+
+	it('falls back to the base payout when Discord sends no Nitro figure', () => {
+		const quest = new Quest(questPayload({ config: { rewards_config: { rewards: [{ type: 4, orb_quantity: 500 }] } } }));
+		expect(quest.rewards[0]).toEqual({ name: 'Unknown reward', type: 4, orbs: 500, premiumOrbs: 500, imageUrl: null });
+	});
+
+	it('keeps rewards that pay no orbs', () => {
+		const quest = new Quest(
+			questPayload({
+				config: { rewards_config: { rewards: [{ type: 3, messages: { name: 'Avatar Decoration' } }] } },
+			}),
+		);
+		expect(quest.rewards[0]).toEqual({
+			name: 'Avatar Decoration',
+			type: 3,
+			orbs: 0,
+			premiumOrbs: 0,
+			imageUrl: null,
+		});
+	});
+
+	it('resolves the reward art under the quest id', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					rewards_config: { rewards: [{ type: 3, asset: 'headgear.png', messages: { name: 'Headgear' } }] },
+				},
+			}),
+		);
+		expect(quest.rewards[0].imageUrl).toBe('https://cdn.discordapp.com/quests/q1/headgear.png');
+	});
+
+	it('treats a video reward as having no still image', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					rewards_config: { rewards: [{ type: 3, asset: 'decoration.mp4', messages: { name: 'Decoration' } }] },
+				},
+			}),
+		);
+		expect(quest.rewards[0].imageUrl).toBeNull();
+		expect(quest.rewardImageUrl).toBeNull();
+	});
+});
+
+describe('Quest copy', () => {
+	it('exposes the publisher and the promo tagline', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					messages: { quest_name: 'Launch', game_title: 'Test Game', game_publisher: 'Test Studio' },
+					cta_config: { subtitle: 'Play the free trial' },
+				},
+			}),
+		);
+
+		expect(quest.publisher).toBe('Test Studio');
+		expect(quest.tagline).toBe('Play the free trial');
+	});
+
+	it('prefers the task description over the call to action subtitle', () => {
+		const quest = new Quest(
+			questPayload({
+				config: {
+					cta_config: { subtitle: 'Play now' },
+					task_config_v2: {
+						tasks: { WATCH_VIDEO: { target: 30, messages: { task_description: 'Watch the trailer' } } },
+					},
+				},
+			}),
+		);
+
+		expect(quest.tagline).toBe('Watch the trailer');
+	});
+});
+
+describe('Quest.brandColor', () => {
+	it('reads the hex color Discord sends in the quest config', () => {
+		const quest = new Quest(questPayload({ config: { colors: { primary: '#E944D4' } } }));
+		expect(quest.brandColor).toBe(0xe944d4);
+	});
+
+	it('accepts a hex color without the leading hash', () => {
+		const quest = new Quest(questPayload({ config: { colors: { primary: '5318A7' } } }));
+		expect(quest.brandColor).toBe(0x5318a7);
+	});
+
+	it('still accepts a numeric color', () => {
+		const quest = new Quest(questPayload({ config: { colors: { primary: 0x5865f2 } } }));
+		expect(quest.brandColor).toBe(0x5865f2);
+	});
+
+	it('ignores missing, zero, and out-of-range colors', () => {
+		expect(new Quest(questPayload()).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: 0 } } })).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: 0x1000000 } } })).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: '#000000' } } })).brandColor).toBeNull();
+		expect(new Quest(questPayload({ config: { colors: { primary: 'blurple' } } })).brandColor).toBeNull();
+	});
+});
+
+describe('Quest.tasks', () => {
+	it('snapshots definitions merged with progress, sorted by percent', () => {
+		const quest = new Quest(
+			questPayload({
+				config: { task_config_v2: { tasks: { PLAY_ACTIVITY: { target: 100 }, WATCH_VIDEO: { target: 50 } } } },
+				userStatus: {
+					progress: { PLAY_ACTIVITY: { value: 100, completed_at: '2026-10-02T00:00:00.000Z' }, WATCH_VIDEO: { value: 25 } },
+				},
+			}),
+		);
+
+		const tasks = quest.tasks;
+		expect(tasks.map((task) => task.id)).toEqual(['PLAY_ACTIVITY', 'WATCH_VIDEO']);
+		expect(tasks[0]).toMatchObject({ percent: 100, completed: true, supported: true });
+		expect(tasks[1]).toMatchObject({ current: 25, target: 50, percent: 50, completed: false });
+	});
+
+	it('treats a reached target as completed even without completed_at', () => {
+		const quest = new Quest(
+			questPayload({
+				userStatus: { progress: { PLAY_ACTIVITY: { value: 600 } } },
+			}),
+		);
+		expect(quest.tasks[0].completed).toBe(true);
+	});
+
+	it('defaults a missing target to zero', () => {
+		const quest = new Quest(questPayload({ config: { task_config_v2: { tasks: { PLAY_ACTIVITY: {} } } } }));
+		expect(quest.tasks[0].target).toBe(0);
+	});
+
+	it('falls back to task_config when task_config_v2 is absent', () => {
+		const quest = new Quest(
+			questPayload({ config: { task_config_v2: undefined, task_config: { tasks: { WATCH_VIDEO: { target: 30 } } } } }),
+		);
+		expect(quest.tasks.map((task) => task.id)).toEqual(['WATCH_VIDEO']);
+	});
+});
+
+describe('Quest.solvableTask', () => {
+	it('picks the supported, incomplete task with the smallest target', () => {
+		const quest = new Quest(
+			questPayload({
+				config: { task_config_v2: { tasks: { PLAY_ACTIVITY: { target: 600 }, WATCH_VIDEO: { target: 60 } } } },
+			}),
+		);
+
+		expect(quest.solvableTask?.id).toBe('WATCH_VIDEO');
+	});
+
+	it('falls back to any supported task so finished quests still resolve', () => {
+		const quest = new Quest(
+			questPayload({
+				userStatus: { progress: { PLAY_ACTIVITY: { value: 600, completed_at: '2026-10-02T00:00:00.000Z' } } },
+			}),
+		);
+
+		expect(quest.solvableTask?.id).toBe('PLAY_ACTIVITY');
+	});
+
+	it('returns null when no task is supported', () => {
+		const quest = new Quest(questPayload({ config: { task_config_v2: { tasks: { DO_THE_DISHES: { target: 5 } } } } }));
+		expect(quest.solvableTask).toBeNull();
+	});
+});
+
+describe('Quest.markProgress', () => {
+	it('writes progress back into the payload, creating user_status on demand', () => {
+		const quest = new Quest(questPayload());
+		quest.markProgress('PLAY_ACTIVITY', 120);
+
+		expect(quest.payload.user_status?.progress?.PLAY_ACTIVITY?.value).toBe(120);
+	});
+
+	it('records completion once and does not overwrite it', () => {
+		const quest = new Quest(questPayload());
+		quest.markProgress('PLAY_ACTIVITY', 600, '2026-10-02T00:00:00.000Z');
+		quest.markProgress('PLAY_ACTIVITY', 600, '2026-10-03T00:00:00.000Z');
+
+		expect(quest.payload.user_status?.completed_at).toBe('2026-10-02T00:00:00.000Z');
+		expect(quest.isCompleted).toBe(true);
+	});
+});
+
+describe('Quest.formatProgress', () => {
+	it('renders a bar with the solvable task progress', () => {
+		const quest = new Quest(
+			questPayload({
+				userStatus: { progress: { PLAY_ACTIVITY: { value: 300 } } },
+			}),
+		);
+
+		const text = quest.formatProgress();
+		expect(text).toContain('50%');
+		expect(text).toContain('5m 0s / 10m 0s');
+	});
+
+	it('reports quests without a runnable task', () => {
+		const quest = new Quest(questPayload({ config: { task_config_v2: { tasks: {} } } }));
+		expect(quest.formatProgress()).toBe('Not automatable');
+	});
+});

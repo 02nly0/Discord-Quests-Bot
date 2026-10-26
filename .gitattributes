@@ -1,0 +1,2 @@
+# Normalize text files to LF so Windows checkouts match Linux CI and Biome.
+* text=auto eol=lf
