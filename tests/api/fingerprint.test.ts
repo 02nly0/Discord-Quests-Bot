@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { buildHeaders } from '../../src/api/fingerprint';
 
+function decodeSuperProperties(headers: Record<string, string>): Record<string, unknown> {
+	return JSON.parse(Buffer.from(headers['x-super-properties'], 'base64').toString('utf8'));
+}
+
 describe('buildHeaders', () => {
 	it('authenticates with the user token and identifies as the desktop client', () => {
 		const headers = buildHeaders('abc.def.ghi', 649389);
@@ -14,11 +18,8 @@ describe('buildHeaders', () => {
 	});
 
 	it('encodes a well-formed x-super-properties payload', () => {
-		const headers = buildHeaders('abc.def.ghi', 654321);
-		const encoded = headers['x-super-properties'];
-		expect(encoded).toBeString();
+		const properties = decodeSuperProperties(buildHeaders('abc.def.ghi', 654321));
 
-		const properties: Record<string, unknown> = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
 		expect(properties).toMatchObject({
 			os: 'Windows',
 			browser: 'Discord Client',
@@ -31,23 +32,12 @@ describe('buildHeaders', () => {
 		expect(typeof properties.client_launch_id).toBe('string');
 	});
 
-	it('maintains a consistent client launch ID and session ID across calls', () => {
-		const sessionA = 'test-session-uuid-1';
-		const headers1 = buildHeaders('token1', 654321, sessionA);
-		const headers2 = buildHeaders('token2', 654321, sessionA);
+	it('reuses the client launch and heartbeat session IDs for the whole process', () => {
+		const first = decodeSuperProperties(buildHeaders('token1', 654321));
+		const second = decodeSuperProperties(buildHeaders('token2', 654321));
 
-		// Cached string should be identical
-		expect(headers1['x-super-properties']).toBe(headers2['x-super-properties']);
-
-		const prop1: Record<string, unknown> = JSON.parse(
-			Buffer.from(headers1['x-super-properties'], 'base64').toString('utf8'),
-		);
-		const prop2: Record<string, unknown> = JSON.parse(
-			Buffer.from(headers2['x-super-properties'], 'base64').toString('utf8'),
-		);
-
-		expect(prop1.client_launch_id).toBe(prop2.client_launch_id);
-		expect(prop1.client_heartbeat_session_id).toBe(sessionA);
-		expect(prop2.client_heartbeat_session_id).toBe(sessionA);
+		expect(first.client_launch_id).toBe(second.client_launch_id);
+		expect(first.client_heartbeat_session_id).toBe(second.client_heartbeat_session_id);
+		expect(first.client_heartbeat_session_id).toBeString();
 	});
 });

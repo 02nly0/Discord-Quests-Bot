@@ -19,16 +19,11 @@ const USER_AGENT =
 	'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
 	`discord/${CLIENT_VERSION} Chrome/${CHROME_VERSION} Electron/${ELECTRON_VERSION} Safari/537.36`;
 
-/** Consistent client launch ID representing this desktop process run. */
-const APP_LAUNCH_ID = crypto.randomUUID();
+// Generated once per process so every request looks like it comes from one
+// running desktop client instead of a fresh launch on every request.
+const CLIENT_SESSION_ID = crypto.randomUUID();
 
-const superPropertiesCache = new Map<string, string>();
-
-export function encodeSuperProperties(buildNumber: number, sessionId: string = APP_LAUNCH_ID): string {
-	const cacheKey = `${buildNumber}:${sessionId}`;
-	const cached = superPropertiesCache.get(cacheKey);
-	if (cached) return cached;
-
+function encodeSuperProperties(buildNumber: number): string {
 	const properties = {
 		os: 'Windows',
 		browser: 'Discord Client',
@@ -45,21 +40,15 @@ export function encodeSuperProperties(buildNumber: number, sessionId: string = A
 		release_channel: 'stable',
 		client_build_number: buildNumber,
 		client_event_source: null,
-		client_launch_id: APP_LAUNCH_ID,
+		client_launch_id: CLIENT_SESSION_ID,
 		client_app_state: 'focused',
-		client_heartbeat_session_id: sessionId,
+		client_heartbeat_session_id: CLIENT_SESSION_ID,
 	};
 
-	const encoded = Buffer.from(JSON.stringify(properties)).toString('base64');
-	superPropertiesCache.set(cacheKey, encoded);
-	return encoded;
+	return Buffer.from(JSON.stringify(properties)).toString('base64');
 }
 
-export function buildHeaders(
-	token: string,
-	buildNumber = getCachedBuildNumber(),
-	sessionId?: string,
-): Record<string, string> {
+export function buildHeaders(token: string, buildNumber = getCachedBuildNumber()): Record<string, string> {
 	// The default reads the cache on every call so a long-running process picks
 	// up a refreshed build number without restarting.
 	return {
@@ -75,6 +64,6 @@ export function buildHeaders(
 		'sec-ch-ua-platform': '"Windows"',
 		'x-discord-locale': 'en-US',
 		'x-discord-timezone': 'UTC',
-		'x-super-properties': encodeSuperProperties(buildNumber, sessionId),
+		'x-super-properties': encodeSuperProperties(buildNumber),
 	};
 }

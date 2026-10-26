@@ -14,7 +14,6 @@ const MAX_ATTEMPTS = 4;
  */
 export class DiscordApiClient {
 	readonly #token: string;
-	readonly #sessionId = crypto.randomUUID();
 	readonly #rateLimitedUntil = new Map<string, number>();
 
 	constructor(token: string) {
@@ -42,7 +41,7 @@ export class DiscordApiClient {
 				method,
 				// Rebuild per request so the cached client build number is re-read
 				// instead of being frozen when the client is constructed.
-				headers: buildHeaders(this.#token, undefined, this.#sessionId),
+				headers: buildHeaders(this.#token),
 				body: body === undefined ? undefined : JSON.stringify(body),
 				signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 			});
