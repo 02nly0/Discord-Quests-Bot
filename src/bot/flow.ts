@@ -30,7 +30,7 @@ import {
 	errorEmbed,
 	type AutomationSnapshot,
 } from './embeds';
-import { activeRuns, pendingSetups, type PendingSetup } from './registry';
+import { activeRuns, deletePendingSetup, getPendingSetup, setPendingSetup, type PendingSetup } from './registry';
 
 const PROGRESS_EDIT_INTERVAL_MS = 4_000;
 
@@ -104,8 +104,7 @@ async function beginQuestSetup(interaction: ModalSubmitInteraction): Promise<voi
 		return;
 	}
 
-	const setup: PendingSetup = { client, quests, index: 0, showCompleted: false };
-	pendingSetups.set(interaction.user.id, setup);
+	const setup = setPendingSetup(interaction.user.id, { client, quests, index: 0, showCompleted: false });
 	await interaction.editReply(setupView(setup));
 }
 
@@ -173,7 +172,7 @@ function questRows(setup: PendingSetup, quests: Quest[]): ActionRowBuilder<Butto
 }
 
 async function browseQuests(interaction: ButtonInteraction, step: number): Promise<void> {
-	const setup = pendingSetups.get(interaction.user.id);
+	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
 		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
 		return;
@@ -187,7 +186,7 @@ async function browseQuests(interaction: ButtonInteraction, step: number): Promi
 }
 
 async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
-	const setup = pendingSetups.get(interaction.user.id);
+	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
 		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
 		return;
@@ -200,7 +199,7 @@ async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
 }
 
 async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
-	const setup = pendingSetups.get(interaction.user.id);
+	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
 		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
 		return;
@@ -216,7 +215,7 @@ async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
 }
 
 async function startRun(interaction: ButtonInteraction, questId: string | null): Promise<void> {
-	const setup = pendingSetups.get(interaction.user.id);
+	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
 		await interaction.reply({ content: 'Run `/quests` first to load your quests.', ephemeral: true });
 		return;
@@ -246,7 +245,7 @@ async function startRun(interaction: ButtonInteraction, questId: string | null):
 	// start two runs.
 	const controller = new AbortController();
 	activeRuns.set(interaction.user.id, { controller });
-	pendingSetups.delete(interaction.user.id);
+	deletePendingSetup(interaction.user.id);
 
 	await runBatch(interaction, setup.client, queue, controller);
 }
