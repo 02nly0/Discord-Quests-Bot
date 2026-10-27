@@ -34,7 +34,21 @@ The quest engine lives in its own module with **zero discord.js dependency**, so
 - [Bun](https://bun.sh) **v1.1+**
 - A Discord application with a bot token (create one in the [developer portal](https://discord.com/developers/applications))
 
+The Windows setup script in `scripts/user` installs Node.js, Bun, and the project dependencies for you, so you can skip the manual Bun install.
+
 ### Installation
+
+#### Windows
+
+1. [Download the repository as a ZIP](https://github.com/DevonNetwork/Discord-Quests-Bot/archive/refs/heads/main.zip) and extract it, or clone it with Git.
+2. Open the `scripts\user` folder and double-click **`install.bat`**. It checks for Node.js and Bun, installs whichever is missing, installs the project dependencies, and creates your `.env` file.
+3. Open `.env` in Notepad and paste your bot token after `DISCORD_TOKEN=`.
+4. Double-click **`run.bat`** to start the bot. Keep its window open while the bot is running.
+
+> [!NOTE]
+> The setup script uses `winget` to install Node.js. If `winget` is unavailable, install Node.js from [nodejs.org](https://nodejs.org) and run `install.bat` again.
+
+#### macOS and Linux
 
 ```sh
 git clone https://github.com/DevonNetwork/Discord-Quests-Bot.git
@@ -44,7 +58,8 @@ bun install
 
 ### Configuration
 
-Copy the example environment file and fill in your bot token:
+The Windows setup script creates `.env` for you. Otherwise, copy the example
+environment file and fill in your bot token:
 
 ```sh
 cp .env.example .env
@@ -66,6 +81,20 @@ bun run check:build-number  # verify Discord's live client build number
 
 The individual quality commands are `bun run typecheck`, `bun run lint`, and
 `bun test`.
+
+### Docker
+
+Build the image and run the container with your `.env` file:
+
+```sh
+docker build -t discord-quests-bot .
+docker run -d --name discord-quests-bot --restart unless-stopped --env-file .env discord-quests-bot
+```
+
+Follow the logs with `docker logs -f discord-quests-bot`, stop the bot with
+`docker stop discord-quests-bot`, and start it again with
+`docker start discord-quests-bot`. The image contains only the runtime
+dependencies, and your `.env` file stays on the host.
 
 ## 🤖 Usage
 
@@ -133,6 +162,10 @@ tests/
 ├── testing/        shared test infrastructure (scripted API client)
 ├── util/           mirrors src/util
 └── config.test.ts
+
+scripts/
+├── check-build-number.ts
+└── user/           Windows setup and run helpers
 ```
 
 Tests live in `tests/` at the repository root and mirror the source layout, so
