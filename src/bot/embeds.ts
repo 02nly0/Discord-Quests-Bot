@@ -107,7 +107,56 @@ export function dashboardEmbed(): EmbedBuilder {
 		.setTitle('Complete your quests')
 		.setDescription(
 			'Press **Complete Quests** and paste your Discord token to automatically finish every available quest.\n\n' +
-				'Your token is used only for this session and is never stored or logged.',
+				"I'll DM you as each quest finishes. Your token is used only for this session and is never stored or logged.",
+		);
+}
+
+export function automationStartedEmbed(total: number): EmbedBuilder {
+	const quests = total === 1 ? '1 quest' : `${total} quests`;
+	return new EmbedBuilder()
+		.setColor(COLORS.primary)
+		.setTitle('Automation started')
+		.setDescription(
+			`I'm completing **${quests}** for you and will message you as each one finishes.\n\n` +
+				'You can close this message. The run continues in the background.',
+		);
+}
+
+export function questCompletedEmbed(quest: Quest, index: number, total: number): EmbedBuilder {
+	const embed = new EmbedBuilder()
+		.setColor(quest.brandColor ?? COLORS.success)
+		.setAuthor({
+			name: truncate(quest.gameName || quest.applicationName || 'Discord Quest', 256),
+			iconURL: quest.logotypeUrl ?? undefined,
+		})
+		.setTitle('Quest completed')
+		.setDescription(truncate(`**${quest.questName}** is done. Claim your reward in the Discord client.`, 4096));
+
+	const thumbnail = quest.rewardImageUrl ?? quest.tileUrl;
+	if (thumbnail) embed.setThumbnail(thumbnail);
+
+	embed.addFields({ name: 'Reward', value: rewardValue(quest) });
+
+	if (quest.rewardsExpireAt) {
+		embed.addFields({
+			name: 'Claim by',
+			value: `<t:${Math.floor(quest.rewardsExpireAt.getTime() / 1000)}:R>`,
+			inline: true,
+		});
+	}
+
+	embed.setFooter({ text: `Quest ${index} of ${total}` });
+
+	return embed;
+}
+
+export function dmUnavailableEmbed(): EmbedBuilder {
+	return new EmbedBuilder()
+		.setColor(COLORS.warning)
+		.setTitle('Direct messages are closed')
+		.setDescription(
+			'I could not send you a DM, so I will show progress here instead.\n\n' +
+				'Enable **Allow direct messages from server members** in your Discord privacy settings to get quest updates in your DMs.',
 		);
 }
 

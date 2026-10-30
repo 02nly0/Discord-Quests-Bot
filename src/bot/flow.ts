@@ -10,7 +10,9 @@ import {
 	type ChatInputCommandInteraction,
 	type Interaction,
 	type ModalSubmitInteraction,
+	type User,
 } from 'discord.js';
+import { features } from '../config';
 import {
 	automatableQuests,
 	completeQuests,
@@ -18,15 +20,19 @@ import {
 	fetchQuests,
 	type DiscordApiClient,
 	type Quest,
+	type QuestBatchResult,
 } from '../quest';
 import { log } from '../util/logger';
 import { describeError } from '../util/format';
 import { ThrottledEditor } from '../util/throttle';
 import {
+	automationStartedEmbed,
 	dashboardEmbed,
+	dmUnavailableEmbed,
 	invalidTokenEmbed,
 	noQuestsEmbed,
 	progressEmbed,
+	questCompletedEmbed,
 	questEmbed,
 	summaryEmbed,
 	errorEmbed,
@@ -77,7 +83,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 	if (!isButtonOwner(interaction.customId, interaction.user.id, interaction.message.interactionMetadata?.user.id)) {
 		await interaction.reply({
 			content: 'This menu belongs to someone else. Run `/quests` to start your own session.',
-			ephemeral: true,
+			ephemeral: interaction.inGuild(),
 		});
 		return;
 	}
@@ -95,13 +101,16 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 	} else if (action === 'stop') {
 		await stopRun(interaction);
 	} else {
-		await interaction.reply({ content: 'That button is no longer available. Run `/quests` again.', ephemeral: true });
+		await interaction.reply({
+			content: 'That button is no longer available. Run `/quests` again.',
+			ephemeral: interaction.inGuild(),
+		});
 	}
 }
 
 async function postDashboard(interaction: ChatInputCommandInteraction): Promise<void> {
 	if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-		await interaction.reply({ content: 'Only administrators can use this command.', ephemeral: true });
+		await interaction.reply({ content: 'Only administrators can use this command.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
@@ -135,7 +144,7 @@ async function showTokenModal(interaction: ChatInputCommandInteraction | ButtonI
 }
 
 async function beginQuestSetup(interaction: ModalSubmitInteraction): Promise<void> {
-	await interaction.deferReply();
+	await interaction.deferReply({ ephemeral: interaction.inGuild() });
 
 	const client = await createApiClient(interaction.fields.getTextInputValue(TOKEN_INPUT_ID));
 	if (!client) {
@@ -222,7 +231,7 @@ function questRows(setup: PendingSetup, quests: Quest[], userId: string): Action
 async function browseQuests(interaction: ButtonInteraction, step: number): Promise<void> {
 	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
-		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
+		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
@@ -236,7 +245,7 @@ async function browseQuests(interaction: ButtonInteraction, step: number): Promi
 async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
 	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
-		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
+		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
@@ -249,13 +258,13 @@ async function toggleCompleted(interaction: ButtonInteraction): Promise<void> {
 async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
 	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
-		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: true });
+		await interaction.reply({ content: 'Run `/quests` again to load your quests.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
 	const quest = visibleQuests(setup)[setup.index];
 	if (!quest) {
-		await interaction.reply({ content: 'Pick a quest first.', ephemeral: true });
+		await interaction.reply({ content: 'Pick a quest first.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
@@ -265,14 +274,14 @@ async function confirmQuest(interaction: ButtonInteraction): Promise<void> {
 async function startRun(interaction: ButtonInteraction, questId: string | null): Promise<void> {
 	const setup = getPendingSetup(interaction.user.id);
 	if (!setup) {
-		await interaction.reply({ content: 'Run `/quests` first to load your quests.', ephemeral: true });
+		await interaction.reply({ content: 'Run `/quests` first to load your quests.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
 	if (activeRuns.has(interaction.user.id)) {
 		await interaction.reply({
 			content: 'You already have an automation running. Press **Stop** to end it first.',
-			ephemeral: true,
+			ephemeral: interaction.inGuild(),
 		});
 		return;
 	}
@@ -284,7 +293,7 @@ async function startRun(interaction: ButtonInteraction, questId: string | null):
 	if (queue.length === 0) {
 		await interaction.reply({
 			content: 'None of your quests can be automated right now.',
-			ephemeral: true,
+			ephemeral: interaction.inGuild(),
 		});
 		return;
 	}
@@ -307,6 +316,8 @@ async function runBatch(
 	const startedAt = Date.now();
 	const firstQuest = queue[0];
 	const firstTask = firstQuest.solvableTask;
+	const user = interaction.user;
+	const inDm = !interaction.inGuild();
 
 	const snapshot: AutomationSnapshot = {
 		questName: firstQuest.displayName,
@@ -318,20 +329,32 @@ async function runBatch(
 		percent: firstTask?.percent ?? 0,
 	};
 
+	const wantsDm = features.dmQuestUpdates;
+	let dmMode = false;
 	let refresh: ThrottledEditor | undefined;
-
-	// The quest browser becomes the progress message in place, so a run never
-	// adds a second embed to the channel. Later edits go through the message
-	// object, whose bot token does not expire like the interaction token does.
-	const message = interaction.message;
+	let dmQueue: Promise<unknown> = Promise.resolve();
 
 	try {
-		await interaction.update({ embeds: [progressEmbed(snapshot)], components: [stopRow(interaction.user.id)] });
+		await interaction.update({
+			embeds: [wantsDm ? automationStartedEmbed(queue.length) : progressEmbed(snapshot)],
+			components: [stopRow(user.id)],
+		});
 
-		refresh = new ThrottledEditor(
-			() => message.edit({ embeds: [progressEmbed(snapshot)], components: [stopRow(interaction.user.id)] }),
-			PROGRESS_EDIT_INTERVAL_MS,
-		);
+		if (wantsDm) {
+			dmMode = inDm || (await startDmSession(user, queue.length));
+			if (!dmMode) {
+				await interaction
+					.followUp({ embeds: [dmUnavailableEmbed()], ephemeral: interaction.inGuild() })
+					.catch(() => undefined);
+			}
+		}
+
+		if (!dmMode) {
+			refresh = new ThrottledEditor(
+				() => interaction.editReply({ embeds: [progressEmbed(snapshot)], components: [stopRow(user.id)] }),
+				PROGRESS_EDIT_INTERVAL_MS,
+			);
+		}
 
 		const result = await completeQuests({
 			client,
@@ -339,42 +362,106 @@ async function runBatch(
 			signal: controller.signal,
 			hooks: {
 				onQuestStart(quest, index) {
+					snapshot.index = index;
+					if (dmMode) return;
+
 					const task = quest.solvableTask;
 					snapshot.questName = quest.displayName;
-					snapshot.index = index;
 					snapshot.current = task?.current ?? 0;
 					snapshot.target = task?.target ?? 0;
 					snapshot.percent = task?.percent ?? 0;
 					refresh?.request();
 				},
 				onQuestProgress(_quest, update) {
+					if (dmMode) return;
+
 					snapshot.current = update.current;
 					snapshot.target = update.target;
 					snapshot.percent = update.percent;
 					refresh?.request();
 				},
-				onQuestCompleted() {
+				onQuestCompleted(quest) {
 					snapshot.completedCount += 1;
+
+					if (dmMode) {
+						const index = snapshot.index;
+						const total = snapshot.total;
+						dmQueue = dmQueue
+							.then(() => user.send({ embeds: [questCompletedEmbed(quest, index, total)] }))
+							.catch((error) => log('bot', `quest update DM failed: ${describeError(error)}`));
+						return;
+					}
+
 					refresh?.request();
 				},
 			},
 		});
 
+		const elapsedMs = Date.now() - startedAt;
+
+		if (dmMode) {
+			await dmQueue;
+			const sent = await sendSummaryDm(user, result, elapsedMs);
+			if (!sent) {
+				await interaction.editReply({ embeds: [summaryEmbed(result, elapsedMs)], components: [] }).catch(() => undefined);
+			}
+			return;
+		}
+
 		// Let an in-flight progress edit settle before the summary replaces it,
 		// otherwise a slow edit could land afterwards and overwrite the summary.
-		await refresh.dispose();
-		await message.edit({
-			embeds: [summaryEmbed(result, Date.now() - startedAt)],
-			components: [],
-		});
-	} catch (error) {
-		log('bot', `automation failed: ${describeError(error)}`);
 		await refresh?.dispose();
-		await message.edit({ embeds: [errorEmbed(describeError(error))], components: [] }).catch(() => undefined);
+		await interaction.editReply({ embeds: [summaryEmbed(result, elapsedMs)], components: [] }).catch(() => undefined);
+	} catch (error) {
+		const message = describeError(error);
+		log('bot', `automation failed: ${message}`);
+
+		if (dmMode) {
+			const sent = await sendErrorDm(user, message);
+			if (!sent) {
+				await interaction.editReply({ embeds: [errorEmbed(message)], components: [] }).catch(() => undefined);
+			}
+		} else {
+			await refresh?.dispose();
+			await interaction.editReply({ embeds: [errorEmbed(message)], components: [] }).catch(() => undefined);
+		}
 	} finally {
 		// Covers the error paths that never reached the explicit dispose above.
 		await refresh?.dispose();
 		activeRuns.delete(interaction.user.id);
+	}
+}
+
+async function startDmSession(user: User, total: number): Promise<boolean> {
+	try {
+		await user.send({
+			embeds: [automationStartedEmbed(total)],
+			components: [stopRow(user.id)],
+		});
+		return true;
+	} catch (error) {
+		log('bot', `start DM failed: ${describeError(error)}`);
+		return false;
+	}
+}
+
+async function sendSummaryDm(user: User, result: QuestBatchResult, elapsedMs: number): Promise<boolean> {
+	try {
+		await user.send({ embeds: [summaryEmbed(result, elapsedMs)] });
+		return true;
+	} catch (error) {
+		log('bot', `summary DM failed: ${describeError(error)}`);
+		return false;
+	}
+}
+
+async function sendErrorDm(user: User, message: string): Promise<boolean> {
+	try {
+		await user.send({ embeds: [errorEmbed(message)] });
+		return true;
+	} catch (error) {
+		log('bot', `error DM failed: ${describeError(error)}`);
+		return false;
 	}
 }
 
@@ -386,12 +473,12 @@ function stopRow(userId: string): ActionRowBuilder<ButtonBuilder> {
 async function stopRun(interaction: ButtonInteraction): Promise<void> {
 	const run = activeRuns.get(interaction.user.id);
 	if (!run) {
-		await interaction.reply({ content: 'Nothing is running right now.', ephemeral: true });
+		await interaction.reply({ content: 'Nothing is running right now.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
 	run.controller.abort();
-	await interaction.reply({ content: 'Stopping after the current heartbeat.', ephemeral: true });
+	await interaction.reply({ content: 'Stopping after the current heartbeat.', ephemeral: interaction.inGuild() });
 }
 
 /** Best-effort fallback when a handler throws before anything was replied. */
@@ -402,7 +489,7 @@ async function recoverInteraction(interaction: Interaction, content: string): Pr
 		if (interaction.deferred || interaction.replied) {
 			await interaction.editReply({ content });
 		} else {
-			await interaction.reply({ content, ephemeral: true });
+			await interaction.reply({ content, ephemeral: interaction.inGuild() });
 		}
 	} catch {
 		// Interaction expired; nothing more we can do.

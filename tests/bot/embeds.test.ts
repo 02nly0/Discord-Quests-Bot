@@ -2,9 +2,12 @@ import { describe, expect, it } from 'bun:test';
 import { Quest } from '../../src/quest';
 import {
 	COLORS,
+	automationStartedEmbed,
+	dmUnavailableEmbed,
 	errorEmbed,
 	invalidTokenEmbed,
 	progressEmbed,
+	questCompletedEmbed,
 	questEmbed,
 	summaryEmbed,
 	type AutomationSnapshot,
@@ -262,6 +265,45 @@ describe('summaryEmbed', () => {
 		expect(embed.title).toBe('Nothing was completed');
 		const lines = (embed.description ?? '').split('\n').filter((line) => line.startsWith('- '));
 		expect(lines).toHaveLength(3);
+	});
+});
+
+describe('DM embeds', () => {
+	it('announces the start of a single quest run', () => {
+		const embed = automationStartedEmbed(1).toJSON();
+
+		expect(embed.title).toBe('Automation started');
+		expect(embed.description).toContain('**1 quest**');
+		expect(embed.description).toContain('message you as each one finishes');
+	});
+
+	it('announces the start of a multi quest run', () => {
+		expect(automationStartedEmbed(3).toJSON().description).toContain('**3 quests**');
+	});
+
+	it('shows the completed quest, reward, and batch position', () => {
+		const embed = questCompletedEmbed(quest('a'), 1, 3).toJSON();
+
+		expect(embed.title).toBe('Quest completed');
+		expect(embed.author?.name).toBe('Test Game');
+		expect(embed.description).toContain('**Quest a**');
+		expect(embed.description).toContain('Claim your reward');
+		expect(embed.fields).toContainEqual(expect.objectContaining({ name: 'Reward' }));
+		expect(embed.footer?.text).toBe('Quest 1 of 3');
+	});
+
+	it('includes the claim deadline when the reward expires', () => {
+		const completed = quest('a', { rewards_config: { rewards_expire_at: '2026-11-05T00:00:00.000Z' } });
+		const embed = questCompletedEmbed(completed, 1, 1).toJSON();
+
+		expect(embed.fields).toContainEqual(expect.objectContaining({ name: 'Claim by' }));
+	});
+
+	it('explains why progress is shown in the channel instead of DMs', () => {
+		const embed = dmUnavailableEmbed().toJSON();
+
+		expect(embed.title).toBe('Direct messages are closed');
+		expect(embed.description).toContain('show progress here instead');
 	});
 });
 

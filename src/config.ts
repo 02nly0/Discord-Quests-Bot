@@ -8,6 +8,7 @@ export interface BotConfig {
 /** Feature toggles. Edit these values and restart the bot to apply them. */
 export const features = {
 	dashboardEnabled: false,
+	dmQuestUpdates: true,
 };
 
 export function loadConfig(): BotConfig {
