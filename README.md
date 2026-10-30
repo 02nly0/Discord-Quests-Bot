@@ -21,7 +21,7 @@ The quest engine lives in its own module with **zero discord.js dependency**, so
 ## ✨ Features
 
 - **Quest browser** - page through every active quest with **Back** and **Next**, see its art, reward, and progress, then press **Confirm** to run it. Completed quests stay out of the way until you press **Show completed**. **Complete all quests** sweeps the rest.
-- **Private quest runs** - every interaction reply is ephemeral, and the bot DMs you as each quest finishes with a summary when the run ends. Set `dmQuestUpdates` to `false` in `src/config.ts` to use the in-channel progress bar instead.
+- **Private quest runs** - every interaction reply is ephemeral, and the bot DMs you as each quest finishes with a summary when the run ends. Set `DM_QUEST_UPDATES=false` in `.env` to use the in-channel progress bar instead.
 - **Full quest coverage** - video quests (watch trailers) and game quests (desktop, Xbox, PlayStation, streaming, play activity) are all automated.
 - **Production-grade API client** - per-route rate limiting, 429 backoff, transient-failure retries, request timeouts, and typed errors.
 - **Resilient automation** - stall detection abandons quests that stop progressing instead of hanging the batch; one failing quest never blocks the rest.
@@ -70,7 +70,7 @@ cp .env.example .env
 | `DISCORD_TOKEN` | ✅ | Bot token from the Discord developer portal                                                          |
 | `GUILD_ID`  | ❌ | Register commands in one guild for instant availability during development; leave empty for global registration |
 
-Feature toggles live in the `features` object in `src/config.ts`. `dmQuestUpdates` is enabled by default and sends quest completion updates by DM; set it to `false` to use the in-channel progress embed instead. `dashboardEnabled` is disabled by default and registers the admin-only `/dashboard` command when set to `true`.
+Feature toggles are read from `.env`; their defaults live in `src/config.ts`. `DM_QUEST_UPDATES` is enabled by default and sends quest completion updates by DM; set it to `false` to use the in-channel progress embed instead. `DASHBOARD_ENABLED` is disabled by default and registers the admin-only `/dashboard` command when set to `true`. Accepted values are `true` or `false`.
 
 The public dashboard language is controlled by `dashboardLanguage` in `src/config.ts`. It defaults to `'ar'` (Arabic); set it to `'en'` for English.
 
@@ -111,7 +111,7 @@ dependencies, and your `.env` file stays on the host.
 
 ### Dashboard
 
-Set `dashboardEnabled` to `true` in the `features` object in `src/config.ts` and restart the bot to register the `/dashboard` command. An administrator can run it in a channel to post a persistent embed with a **Get Started** button. Anyone in that channel can press the button, follow the private prompt, and use the same quest browser without running a slash command. Every reply in that flow is private, and quest completion updates arrive by DM.
+Set `DASHBOARD_ENABLED=true` in `.env` and restart the bot to register the `/dashboard` command. An administrator can run it in a channel to post a persistent embed with a **Get Started** button. Anyone in that channel can press the button, follow the private prompt, and use the same quest browser without running a slash command. Every reply in that flow is private, and quest completion updates arrive by DM.
 
 The embed is posted in Arabic by default. The **English version** button opens the same embed in English for that user, and the **النسخة العربية** button switches back. Set `dashboardLanguage` to `'en'` to make English the default instead.
 
