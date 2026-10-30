@@ -1,6 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
+import type { Language } from '../config';
 import type { Quest, QuestBatchResult } from '../quest';
 import { progressBar, truncate } from '../util/format';
+import { DASHBOARD_COPY } from './i18n';
 import { formatDuration, formatElapsed } from '../util/time';
 
 export const COLORS = {
@@ -99,6 +101,68 @@ export function questEmbed(quest: Quest, index: number, total: number): EmbedBui
 	embed.setFooter({ text: quest.publisher ? `${truncate(quest.publisher, 100)} · ${page}` : page });
 
 	return embed;
+}
+
+export function dashboardEmbed(language: Language, botName: string, botIcon?: string): EmbedBuilder {
+	const copy = DASHBOARD_COPY[language];
+
+	return new EmbedBuilder()
+		.setColor(COLORS.primary)
+		.setAuthor({ name: truncate(botName, 256), iconURL: botIcon })
+		.setTitle(copy.title)
+		.setDescription(copy.description)
+		.addFields(copy.fields)
+		.setImage('attachment://dashboard-banner.png')
+		.setFooter({ text: copy.footer, iconURL: botIcon });
+}
+
+export function automationStartedEmbed(total: number): EmbedBuilder {
+	const quests = total === 1 ? '1 quest' : `${total} quests`;
+	return new EmbedBuilder()
+		.setColor(COLORS.primary)
+		.setTitle('Automation started')
+		.setDescription(
+			`I'm completing **${quests}** for you and will message you as each one finishes.\n\n` +
+				'You can close this message. The run continues in the background.',
+		);
+}
+
+export function questCompletedEmbed(quest: Quest, index: number, total: number): EmbedBuilder {
+	const embed = new EmbedBuilder()
+		.setColor(quest.brandColor ?? COLORS.success)
+		.setAuthor({
+			name: truncate(quest.gameName || quest.applicationName || 'Discord Quest', 256),
+			iconURL: quest.logotypeUrl ?? undefined,
+		})
+		.setTitle('Quest completed')
+		.setDescription(truncate(`**${quest.questName}** is done. Claim your reward in the Discord client.`, 4096));
+
+	const thumbnail = quest.rewardImageUrl ?? quest.tileUrl;
+	if (thumbnail) embed.setThumbnail(thumbnail);
+
+	embed.addFields({ name: 'Reward', value: rewardValue(quest) });
+
+	if (quest.rewardsExpireAt) {
+		embed.addFields({
+			name: 'Claim by',
+			value: `<t:${Math.floor(quest.rewardsExpireAt.getTime() / 1000)}:R>`,
+			inline: true,
+		});
+	}
+
+	embed.setFooter({ text: `Quest ${index} of ${total}` });
+
+	return embed;
+}
+
+export function dmUnavailableEmbed(): EmbedBuilder {
+	return new EmbedBuilder()
+		.setColor(COLORS.warning)
+		.setTitle('Direct messages are closed')
+		.setDescription(
+			'I could not send you a DM, so I will show progress here instead.\n\n' +
+				'Enable **Allow direct messages from server members** in your Discord privacy settings to get quest updates in your DMs.',
+		);
 }
 
 export function noQuestsEmbed(): EmbedBuilder {

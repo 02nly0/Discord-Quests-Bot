@@ -1,6 +1,6 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { resolveBuildNumber } from '../api/build-number';
-import type { BotConfig } from '../config';
+import { features, type BotConfig } from '../config';
 import { log } from '../util/logger';
 import { registerCommands } from './commands';
 import { handleInteraction } from './flow';
@@ -20,7 +20,7 @@ export async function startBot(config: BotConfig): Promise<Client> {
 	client.once(Events.ClientReady, async (ready) => {
 		log('bot', `logged in as ${ready.user.tag}`);
 		try {
-			await registerCommands(config.botToken, ready.application.id, config.guildId);
+			await registerCommands(config.botToken, ready.application.id, config.guildId, features.dashboardEnabled);
 			log('bot', config.guildId ? 'commands registered (guild)' : 'commands registered (global)');
 		} catch (error) {
 			log('bot', `command registration failed: ${String(error)}`);
