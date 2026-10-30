@@ -1,6 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
+import type { Language } from '../config';
 import type { Quest, QuestBatchResult } from '../quest';
 import { progressBar, truncate } from '../util/format';
+import { DASHBOARD_COPY } from './i18n';
 import { formatDuration, formatElapsed } from '../util/time';
 
 export const COLORS = {
@@ -101,14 +103,17 @@ export function questEmbed(quest: Quest, index: number, total: number): EmbedBui
 	return embed;
 }
 
-export function dashboardEmbed(): EmbedBuilder {
+export function dashboardEmbed(language: Language, botName: string, botIcon?: string): EmbedBuilder {
+	const copy = DASHBOARD_COPY[language];
+
 	return new EmbedBuilder()
 		.setColor(COLORS.primary)
-		.setTitle('Complete your quests')
-		.setDescription(
-			'Press **Complete Quests** and paste your Discord token to automatically finish every available quest.\n\n' +
-				"I'll DM you as each quest finishes. Your token is used only for this session and is never stored or logged.",
-		);
+		.setAuthor({ name: truncate(botName, 256), iconURL: botIcon })
+		.setTitle(copy.title)
+		.setDescription(copy.description)
+		.addFields(copy.fields)
+		.setImage('attachment://dashboard-banner.png')
+		.setFooter({ text: copy.footer, iconURL: botIcon });
 }
 
 export function automationStartedEmbed(total: number): EmbedBuilder {

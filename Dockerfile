@@ -13,6 +13,7 @@ ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json tsconfig.json ./
 COPY src ./src
+COPY assets ./assets
 
 USER bun
 

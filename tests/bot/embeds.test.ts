@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { Quest } from '../../src/quest';
+import { DASHBOARD_COPY } from '../../src/bot/i18n';
 import {
 	COLORS,
 	automationStartedEmbed,
+	dashboardEmbed,
 	dmUnavailableEmbed,
 	errorEmbed,
 	invalidTokenEmbed,
@@ -265,6 +267,37 @@ describe('summaryEmbed', () => {
 		expect(embed.title).toBe('Nothing was completed');
 		const lines = (embed.description ?? '').split('\n').filter((line) => line.startsWith('- '));
 		expect(lines).toHaveLength(3);
+	});
+});
+
+describe('dashboardEmbed', () => {
+	it('presents the English dashboard without credentials in the public copy', () => {
+		const embed = dashboardEmbed('en', 'Quest Bot', 'https://example.com/icon.png').toJSON();
+		const copy = JSON.stringify(embed).toLowerCase();
+
+		expect(embed.title).toBe('Your quests, on autopilot');
+		expect(embed.author?.name).toBe('Quest Bot');
+		expect(embed.image?.url).toBe('attachment://dashboard-banner.png');
+		expect(embed.footer?.text).toContain('Get Started');
+		expect(embed.fields?.every((field) => field.inline)).toBe(true);
+		expect(copy).not.toContain('token');
+		expect(copy).not.toContain('paste');
+	});
+
+	it('presents the Arabic dashboard by default', () => {
+		const embed = dashboardEmbed('ar', 'Quest Bot').toJSON();
+		const copy = JSON.stringify(embed).toLowerCase();
+
+		expect(embed.title).toBe('مهامك على الطيار الآلي');
+		expect(embed.footer?.text).toContain('ابدأ الآن');
+		expect(embed.fields?.every((field) => field.inline)).toBe(true);
+		expect(copy).not.toContain('token');
+		expect(copy).not.toContain('paste');
+	});
+
+	it('labels the language switch with the language it opens', () => {
+		expect(DASHBOARD_COPY.ar.languageSwitch).toBe('English version');
+		expect(DASHBOARD_COPY.en.languageSwitch).toBe('النسخة العربية');
 	});
 });
 

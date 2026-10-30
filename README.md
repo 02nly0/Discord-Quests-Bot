@@ -12,7 +12,7 @@
 
 </div>
 
-Discord Quests Bot is a self-hosted Discord bot that drives your account's quests to 100% for you. Run `/quests`, paste your token, and pick a single quest or sweep every active one - the bot reports live progress in a channel embed and stops cleanly whenever you tell it to.
+Discord Quests Bot is a self-hosted Discord bot that drives your account's quests to 100% for you. Run `/quests`, follow the private prompt, and pick a single quest or sweep every active one - the bot reports progress in your DMs and stops cleanly whenever you tell it to.
 
 The quest engine lives in its own module with **zero discord.js dependency**, so you can run the bot as-is or embed the engine in your own projects.
 
@@ -72,6 +72,8 @@ cp .env.example .env
 
 Feature toggles live in the `features` object in `src/config.ts`. `dmQuestUpdates` is enabled by default and sends quest completion updates by DM; set it to `false` to use the in-channel progress embed instead. `dashboardEnabled` is disabled by default and registers the admin-only `/dashboard` command when set to `true`.
 
+The public dashboard language is controlled by `dashboardLanguage` in `src/config.ts`. It defaults to `'ar'` (Arabic); set it to `'en'` for English.
+
 ### Running
 
 ```sh
@@ -109,7 +111,9 @@ dependencies, and your `.env` file stays on the host.
 
 ### Dashboard
 
-Set `dashboardEnabled` to `true` in the `features` object in `src/config.ts` and restart the bot to register the `/dashboard` command. An administrator can run it in a channel to post a persistent embed with a **Complete Quests** button. Anyone in that channel can press the button, paste their token, and use the same quest browser without running a slash command. Every reply in that flow is private, and quest completion updates arrive by DM.
+Set `dashboardEnabled` to `true` in the `features` object in `src/config.ts` and restart the bot to register the `/dashboard` command. An administrator can run it in a channel to post a persistent embed with a **Get Started** button. Anyone in that channel can press the button, follow the private prompt, and use the same quest browser without running a slash command. Every reply in that flow is private, and quest completion updates arrive by DM.
+
+The embed is posted in Arabic by default. The **English version** button opens the same embed in English for that user, and the **النسخة العربية** button switches back. Set `dashboardLanguage` to `'en'` to make English the default instead.
 
 > [!NOTE]
 > The `/dashboard` command requires the **Administrator** permission, but the button in the posted embed is available to everyone who can see the channel.

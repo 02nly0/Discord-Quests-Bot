@@ -5,6 +5,11 @@ export interface BotConfig {
 	guildId?: string;
 }
 
+export type Language = 'ar' | 'en';
+
+/** Language of the public dashboard embed. Defaults to Arabic. */
+export const dashboardLanguage: Language = 'ar';
+
 /** Feature toggles. Edit these values and restart the bot to apply them. */
 export const features = {
 	dashboardEnabled: false,

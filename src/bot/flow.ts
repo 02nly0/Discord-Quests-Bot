@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
 import {
 	ActionRowBuilder,
+	AttachmentBuilder,
 	ButtonBuilder,
 	ButtonStyle,
+	MessageFlags,
 	ModalBuilder,
 	PermissionFlagsBits,
 	TextInputBuilder,
@@ -12,7 +15,7 @@ import {
 	type ModalSubmitInteraction,
 	type User,
 } from 'discord.js';
-import { features } from '../config';
+import { dashboardLanguage, features, type Language } from '../config';
 import {
 	automatableQuests,
 	completeQuests,
@@ -38,6 +41,7 @@ import {
 	errorEmbed,
 	type AutomationSnapshot,
 } from './embeds';
+import { DASHBOARD_COPY } from './i18n';
 import { activeRuns, deletePendingSetup, getPendingSetup, setPendingSetup, type PendingSetup } from './registry';
 
 const PROGRESS_EDIT_INTERVAL_MS = 4_000;
@@ -50,7 +54,13 @@ const PREV_ID = 'quests:prev';
 const NEXT_ID = 'quests:next';
 const CONFIRM_ID = 'quests:confirm';
 const TOGGLE_COMPLETED_ID = 'quests:toggle-completed';
-const DASHBOARD_COMPLETE_ID = 'dashboard:complete';
+const DASHBOARD_START_PREFIX = 'dashboard:start:';
+const DASHBOARD_LANGUAGE_PREFIX = 'dashboard:lang:';
+const LEGACY_DASHBOARD_COMPLETE_ID = 'dashboard:complete';
+
+function parseLanguage(value: string | undefined): Language {
+	return value === 'ar' || value === 'en' ? value : dashboardLanguage;
+}
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
 	try {
@@ -60,8 +70,15 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
 			await postDashboard(interaction);
 		} else if (interaction.isModalSubmit() && interaction.customId === MODAL_ID) {
 			await beginQuestSetup(interaction);
-		} else if (interaction.isButton() && interaction.customId === DASHBOARD_COMPLETE_ID) {
+		} else if (interaction.isButton() && interaction.customId.startsWith(DASHBOARD_START_PREFIX)) {
 			await showTokenModal(interaction);
+		} else if (interaction.isButton() && interaction.customId === LEGACY_DASHBOARD_COMPLETE_ID) {
+			await showTokenModal(interaction);
+		} else if (interaction.isButton() && interaction.customId.startsWith(DASHBOARD_LANGUAGE_PREFIX)) {
+			await showDashboardLanguage(
+				interaction,
+				parseLanguage(interaction.customId.slice(DASHBOARD_LANGUAGE_PREFIX.length)),
+			);
 		} else if (interaction.isButton() && interaction.customId.startsWith('quests:')) {
 			await handleButtonInteraction(interaction);
 		}
@@ -108,28 +125,67 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 	}
 }
 
+function dashboardRow(language: Language): ActionRowBuilder<ButtonBuilder> {
+	const copy = DASHBOARD_COPY[language];
+	const other: Language = language === 'ar' ? 'en' : 'ar';
+
+	const start = new ButtonBuilder()
+		.setCustomId(`${DASHBOARD_START_PREFIX}${language}`)
+		.setLabel(copy.start)
+		.setStyle(ButtonStyle.Primary);
+
+	const switchLanguage = new ButtonBuilder()
+		.setCustomId(`${DASHBOARD_LANGUAGE_PREFIX}${other}`)
+		.setLabel(copy.languageSwitch)
+		.setStyle(ButtonStyle.Secondary);
+
+	return new ActionRowBuilder<ButtonBuilder>().addComponents(start, switchLanguage);
+}
+
+function dashboardBanner(): AttachmentBuilder {
+	return new AttachmentBuilder(readFileSync(new URL('../../assets/dashboard-banner.png', import.meta.url)), {
+		name: 'dashboard-banner.png',
+	});
+}
+
+function dashboardView(language: Language, botName: string, botIcon?: string) {
+	return {
+		embeds: [dashboardEmbed(language, botName, botIcon)],
+		components: [dashboardRow(language)],
+	};
+}
+
 async function postDashboard(interaction: ChatInputCommandInteraction): Promise<void> {
 	if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
 		await interaction.reply({ content: 'Only administrators can use this command.', ephemeral: interaction.inGuild() });
 		return;
 	}
 
-	const complete = new ButtonBuilder()
-		.setCustomId(DASHBOARD_COMPLETE_ID)
-		.setLabel('Complete Quests')
-		.setStyle(ButtonStyle.Primary);
+	const bot = interaction.client.user;
 
 	await interaction.reply({
-		embeds: [dashboardEmbed()],
-		components: [new ActionRowBuilder<ButtonBuilder>().addComponents(complete)],
+		...dashboardView(dashboardLanguage, bot?.username ?? 'Quest Dashboard', bot?.displayAvatarURL()),
+		files: [dashboardBanner()],
 	});
+}
+
+async function showDashboardLanguage(interaction: ButtonInteraction, language: Language): Promise<void> {
+	const bot = interaction.client.user;
+	const view = dashboardView(language, bot?.username ?? 'Quest Dashboard', bot?.displayAvatarURL());
+
+	if (interaction.message.flags.has(MessageFlags.Ephemeral)) {
+		await interaction.update(view);
+		return;
+	}
+
+	await interaction.reply({ ...view, files: [dashboardBanner()], ephemeral: interaction.inGuild() });
 }
 
 async function showTokenModal(interaction: ChatInputCommandInteraction | ButtonInteraction): Promise<void> {
 	const tokenInput = new TextInputBuilder()
 		.setCustomId(TOKEN_INPUT_ID)
-		.setLabel('Your Discord token')
-		.setPlaceholder('Paste your Discord token. It is never stored or logged.')
+		.setLabel('Discord token')
+		.setPlaceholder('Used only for this session and never stored or logged.')
 		.setStyle(TextInputStyle.Paragraph)
 		.setMinLength(40)
 		.setMaxLength(120)
@@ -137,7 +193,7 @@ async function showTokenModal(interaction: ChatInputCommandInteraction | ButtonI
 
 	const modal = new ModalBuilder()
 		.setCustomId(MODAL_ID)
-		.setTitle('Discord Quests')
+		.setTitle('Private quest setup')
 		.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(tokenInput));
 
 	await interaction.showModal(modal);
