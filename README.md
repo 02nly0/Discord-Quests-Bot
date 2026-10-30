@@ -100,6 +100,9 @@ Follow the logs with `docker logs -f discord-quests-bot`, stop the bot with
 `docker start discord-quests-bot`. The image contains only the runtime
 dependencies, and your `.env` file stays on the host.
 
+The bot also listens on port `8080` and answers every request with a short
+health message, which satisfies hosts that expect a web service URL.
+
 ## 🤖 Usage
 
 1. Run **`/quests`** in any server the bot is in.

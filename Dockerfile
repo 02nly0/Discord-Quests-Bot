@@ -15,6 +15,8 @@ COPY package.json tsconfig.json ./
 COPY src ./src
 COPY assets ./assets
 
+EXPOSE 8080
+
 USER bun
 
 CMD ["bun", "run", "src/index.ts"]
