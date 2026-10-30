@@ -3,6 +3,7 @@ import {
 	ButtonBuilder,
 	ButtonStyle,
 	ModalBuilder,
+	PermissionFlagsBits,
 	TextInputBuilder,
 	TextInputStyle,
 	type ButtonInteraction,
@@ -22,6 +23,7 @@ import { log } from '../util/logger';
 import { describeError } from '../util/format';
 import { ThrottledEditor } from '../util/throttle';
 import {
+	dashboardEmbed,
 	invalidTokenEmbed,
 	noQuestsEmbed,
 	progressEmbed,
@@ -42,13 +44,18 @@ const PREV_ID = 'quests:prev';
 const NEXT_ID = 'quests:next';
 const CONFIRM_ID = 'quests:confirm';
 const TOGGLE_COMPLETED_ID = 'quests:toggle-completed';
+const DASHBOARD_COMPLETE_ID = 'dashboard:complete';
 
 export async function handleInteraction(interaction: Interaction): Promise<void> {
 	try {
 		if (interaction.isChatInputCommand() && interaction.commandName === 'quests') {
 			await showTokenModal(interaction);
+		} else if (interaction.isChatInputCommand() && interaction.commandName === 'dashboard') {
+			await postDashboard(interaction);
 		} else if (interaction.isModalSubmit() && interaction.customId === MODAL_ID) {
 			await beginQuestSetup(interaction);
+		} else if (interaction.isButton() && interaction.customId === DASHBOARD_COMPLETE_ID) {
+			await showTokenModal(interaction);
 		} else if (interaction.isButton() && interaction.customId.startsWith('quests:')) {
 			await handleButtonInteraction(interaction);
 		}
@@ -92,7 +99,24 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 	}
 }
 
-async function showTokenModal(interaction: ChatInputCommandInteraction): Promise<void> {
+async function postDashboard(interaction: ChatInputCommandInteraction): Promise<void> {
+	if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+		await interaction.reply({ content: 'Only administrators can use this command.', ephemeral: true });
+		return;
+	}
+
+	const complete = new ButtonBuilder()
+		.setCustomId(DASHBOARD_COMPLETE_ID)
+		.setLabel('Complete Quests')
+		.setStyle(ButtonStyle.Primary);
+
+	await interaction.reply({
+		embeds: [dashboardEmbed()],
+		components: [new ActionRowBuilder<ButtonBuilder>().addComponents(complete)],
+	});
+}
+
+async function showTokenModal(interaction: ChatInputCommandInteraction | ButtonInteraction): Promise<void> {
 	const tokenInput = new TextInputBuilder()
 		.setCustomId(TOKEN_INPUT_ID)
 		.setLabel('Your Discord token')

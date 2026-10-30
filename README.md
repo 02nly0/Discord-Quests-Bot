@@ -105,6 +105,13 @@ dependencies, and your `.env` file stays on the host.
 5. Watch the progress embed, press **Stop** whenever you like.
 6. Claim your rewards in the Discord client and enjoy.
 
+### Dashboard
+
+Set `dashboardEnabled` to `true` in the `features` object in `src/config.ts` and restart the bot to register the `/dashboard` command. An administrator can run it in a channel to post a persistent embed with a **Complete Quests** button. Anyone in that channel can press the button, paste their token, and use the same quest browser without running a slash command.
+
+> [!NOTE]
+> The `/dashboard` command requires the **Administrator** permission, but the button in the posted embed is available to everyone who can see the channel.
+
 > [!NOTE]
 > Rewards are not claimed automatically. When a quest hits 100%, open the Discord client and claim it from your quest page like you normally would.
 
@@ -152,7 +159,7 @@ src/
 │   ├── runner.ts       heartbeat / video-progress loop
 │   └── tasks.ts        supported task registry and pacing
 ├── util/           Small shared helpers
-├── config.ts       environment configuration
+├── config.ts       environment configuration and feature toggles
 └── index.ts        entry point
 
 tests/

@@ -5,6 +5,11 @@ export interface BotConfig {
 	guildId?: string;
 }
 
+/** Feature toggles. Edit these values and restart the bot to apply them. */
+export const features = {
+	dashboardEnabled: false,
+};
+
 export function loadConfig(): BotConfig {
 	const botToken = process.env.DISCORD_TOKEN;
 	if (!botToken) {

@@ -101,6 +101,16 @@ export function questEmbed(quest: Quest, index: number, total: number): EmbedBui
 	return embed;
 }
 
+export function dashboardEmbed(): EmbedBuilder {
+	return new EmbedBuilder()
+		.setColor(COLORS.primary)
+		.setTitle('Complete your quests')
+		.setDescription(
+			'Press **Complete Quests** and paste your Discord token to automatically finish every available quest.\n\n' +
+				'Your token is used only for this session and is never stored or logged.',
+		);
+}
+
 export function noQuestsEmbed(): EmbedBuilder {
 	return new EmbedBuilder()
 		.setColor(COLORS.success)
