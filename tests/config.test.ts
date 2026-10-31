@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { loadConfig, loadFeatures } from '../src/config';
+import { loadConfig, loadFeatures, loadLogging } from '../src/config';
 
 const originalToken = process.env.DISCORD_TOKEN;
 const originalGuildId = process.env.GUILD_ID;
@@ -44,6 +44,56 @@ describe('loadConfig', () => {
 		process.env.GUILD_ID = ' 123456789 ';
 
 		expect(loadConfig()).toEqual({ botToken: 'bot-token', guildId: '123456789' });
+	});
+});
+
+describe('loadLogging', () => {
+	const names = [
+		'LOGGING_MODE',
+		'LOG_CONSOLE_ENABLED',
+		'LOG_WEBHOOK_ENABLED',
+		'LOG_WEBHOOK_URL',
+		'LOG_CHANNEL_ENABLED',
+		'LOG_CHANNEL_ID',
+	];
+
+	beforeEach(() => {
+		for (const name of names) delete process.env[name];
+	});
+
+	afterEach(() => {
+		for (const name of names) delete process.env[name];
+	});
+
+	it('logs to the console only by default', () => {
+		expect(loadLogging()).toEqual({
+			mode: true,
+			console: { enabled: true },
+			webhook: { enabled: false, url: '' },
+			channel: { enabled: false, id: '' },
+		});
+	});
+
+	it('reads every logging setting from the environment', () => {
+		process.env.LOGGING_MODE = 'false';
+		process.env.LOG_CONSOLE_ENABLED = '0';
+		process.env.LOG_WEBHOOK_ENABLED = 'true';
+		process.env.LOG_WEBHOOK_URL = ' https://discord.com/api/webhooks/1/abc ';
+		process.env.LOG_CHANNEL_ENABLED = 'true';
+		process.env.LOG_CHANNEL_ID = ' 123 ';
+
+		expect(loadLogging()).toEqual({
+			mode: false,
+			console: { enabled: false },
+			webhook: { enabled: true, url: 'https://discord.com/api/webhooks/1/abc' },
+			channel: { enabled: true, id: '123' },
+		});
+	});
+
+	it('rejects values that are not booleans', () => {
+		process.env.LOGGING_MODE = 'maybe';
+
+		expect(() => loadLogging()).toThrow('LOGGING_MODE must be true or false');
 	});
 });
 

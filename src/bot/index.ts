@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { resolveBuildNumber } from '../api/build-number';
 import { features, type BotConfig } from '../config';
 import { log } from '../util/logger';
+import { questLog } from '../util/quest-logger';
 import { registerCommands } from './commands';
 import { handleInteraction } from './flow';
 import { startSetupCleanup } from './registry';
@@ -16,6 +17,8 @@ export async function startBot(config: BotConfig): Promise<Client> {
 	const client = new Client({
 		intents: [GatewayIntentBits.Guilds],
 	});
+
+	questLog.attachClient(client);
 
 	client.once(Events.ClientReady, async (ready) => {
 		log('bot', `logged in as ${ready.user.tag}`);
