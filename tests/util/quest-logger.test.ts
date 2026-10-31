@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import type { APIEmbed } from 'discord.js';
 import type { LoggingConfig } from '../../src/config';
 import { createQuestLogger, redact } from '../../src/util/quest-logger';
 
@@ -20,9 +21,14 @@ function config(
 	};
 }
 
+interface ChannelMessage {
+	embeds: APIEmbed[];
+	allowedMentions: { parse: [] };
+}
+
 let consoleOutput: string[];
 let webhookBodies: string[];
-let channelMessages: unknown[];
+let channelMessages: ChannelMessage[];
 let restoreConsole: () => void;
 
 function fakeFetch(handler: (url: string, init: RequestInit) => Response | Promise<Response>): typeof fetch {
@@ -36,7 +42,7 @@ const okFetch = fakeFetch((_url, init) => {
 });
 
 const resolveChannel = async () => ({
-	send: async (message: unknown) => {
+	send: async (message: ChannelMessage) => {
 		channelMessages.push(message);
 	},
 });
@@ -114,6 +120,15 @@ describe('formatting', () => {
 		);
 	});
 
+	it('sends channel embeds with mentions disabled', async () => {
+		await build({ channel: true }).record('completed', user, quest);
+
+		expect(channelMessages[0].allowedMentions).toEqual({ parse: [] });
+		expect(channelMessages[0].embeds[0].description).toBe(
+			'<@42> (amtix/42) successfully completed quest: Call of Duty: Modern Warfare 4.',
+		);
+	});
+
 	it('words each event for the right outcome', async () => {
 		const logger = build({ webhook: true });
 		await logger.record('command', user);
@@ -164,6 +179,18 @@ describe('failures', () => {
 		expect(consoleOutput.join('\n')).not.toContain('abcDEF_secret-token');
 	});
 
+	it('gives webhook requests an abort timeout', async () => {
+		let signal: AbortSignal | null | undefined;
+		const captureFetch = fakeFetch((_url, init) => {
+			signal = init.signal;
+			return new Response(null, { status: 204 });
+		});
+
+		await build({ webhook: true }, { fetch: captureFetch }).record('started', user, quest);
+
+		expect(signal).toBeInstanceOf(AbortSignal);
+	});
+
 	it('retries once after a rate limit', async () => {
 		let calls = 0;
 		const limitedFetch = fakeFetch(() => {
@@ -176,6 +203,19 @@ describe('failures', () => {
 		await build({ webhook: true }, { fetch: limitedFetch }).record('started', user, quest);
 
 		expect(calls).toBe(2);
+	});
+
+	it('does not retry when the rate limit wait is too long', async () => {
+		let calls = 0;
+		const longLimitFetch = fakeFetch(() => {
+			calls += 1;
+			return new Response(null, { status: 429, headers: { 'retry-after': '120' } });
+		});
+
+		await build({ webhook: true }, { fetch: longLimitFetch }).record('started', user, quest);
+
+		expect(calls).toBe(1);
+		expect(consoleOutput.some((line) => line.includes('rate limit asked for a 120s wait'))).toBe(true);
 	});
 
 	it('warns and skips the webhook when the URL is missing', async () => {

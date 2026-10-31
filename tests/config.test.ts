@@ -56,13 +56,17 @@ describe('loadLogging', () => {
 		'LOG_CHANNEL_ENABLED',
 		'LOG_CHANNEL_ID',
 	];
+	const original = new Map(names.map((name) => [name, process.env[name]]));
 
 	beforeEach(() => {
 		for (const name of names) delete process.env[name];
 	});
 
 	afterEach(() => {
-		for (const name of names) delete process.env[name];
+		for (const [name, value] of original) {
+			if (value === undefined) delete process.env[name];
+			else process.env[name] = value;
+		}
 	});
 
 	it('logs to the console only by default', () => {

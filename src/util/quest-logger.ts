@@ -28,7 +28,8 @@ export interface QuestLoggerOptions {
 }
 
 const REDACTED = '[REDACTED]';
-const MAX_RATE_LIMIT_WAIT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_RATE_LIMIT_WAIT_MS = 60_000;
 const WEBHOOK_URL = /^https:\/\/(?:(?:canary|ptb)\.)?discord(?:app)?\.com\/api(?:\/v\d+)?\/webhooks\/\d+\/[\w-]+$/;
 const CHANNEL_ID = /^\d{17,20}$/;
 
@@ -106,14 +107,24 @@ export function createQuestLogger(config: LoggingConfig, options: QuestLoggerOpt
 
 	async function postWebhook(body: string): Promise<void> {
 		const request = () =>
-			send(config.webhook.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+			send(config.webhook.url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body,
+				signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+			});
 
 		let response = await request();
 		if (response.status === 429) {
 			const header = response.headers.get('retry-after');
-			const retryAfter = header === null ? 1 : Number(header);
+			const retryAfter = header === null || header.trim() === '' ? 1 : Number(header);
 			const waitMs = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1000 : 1000;
-			await sleep(Math.min(waitMs, MAX_RATE_LIMIT_WAIT_MS));
+			if (waitMs > MAX_RATE_LIMIT_WAIT_MS) {
+				throw new Error(
+					`Webhook rate limit asked for a ${Math.ceil(waitMs / 1000)}s wait, above the ${MAX_RATE_LIMIT_WAIT_MS / 1000}s limit.`,
+				);
+			}
+			await sleep(waitMs);
 			response = await request();
 		}
 		if (!response.ok) throw new Error(`Webhook request failed with status ${response.status}.`);

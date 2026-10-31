@@ -466,7 +466,10 @@ async function runBatch(
 			},
 		});
 
-		if (result.stopped) void questLog.record('cancelled', user, activeQuest);
+		// A stop that lands after the last quest finished is not a cancellation.
+		if (result.stopped && result.completed.length + result.failed.length < queue.length) {
+			void questLog.record('cancelled', user, activeQuest);
+		}
 
 		const elapsedMs = Date.now() - startedAt;
 

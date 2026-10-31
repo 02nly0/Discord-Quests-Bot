@@ -72,6 +72,8 @@ cp .env.example .env
 
 Feature toggles are read from `.env`; their defaults live in `src/config.ts`. `DM_QUEST_UPDATES` is enabled by default and sends quest completion updates by DM; set it to `false` to use the in-channel progress embed instead. `DASHBOARD_ENABLED` is disabled by default and registers the admin-only `/dashboard` command when set to `true`. Accepted values are `true` or `false`.
 
+Quest activity logging is controlled by `LOGGING_MODE`. When enabled, `LOG_CONSOLE_ENABLED`, `LOG_WEBHOOK_ENABLED` with `LOG_WEBHOOK_URL`, and `LOG_CHANNEL_ENABLED` with `LOG_CHANNEL_ID` select the destinations independently. Secrets are redacted before anything is sent.
+
 The public dashboard language is controlled by `dashboardLanguage` in `src/config.ts`. It defaults to `'ar'` (Arabic); set it to `'en'` for English.
 
 ### Running
