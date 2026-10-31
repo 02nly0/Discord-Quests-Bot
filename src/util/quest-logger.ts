@@ -110,8 +110,10 @@ export function createQuestLogger(config: LoggingConfig, options: QuestLoggerOpt
 
 		let response = await request();
 		if (response.status === 429) {
-			const retryAfter = Number(response.headers.get('retry-after')) || 1;
-			await sleep(Math.min(retryAfter * 1000, MAX_RATE_LIMIT_WAIT_MS));
+			const header = response.headers.get('retry-after');
+			const retryAfter = header === null ? 1 : Number(header);
+			const waitMs = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1000 : 1000;
+			await sleep(Math.min(waitMs, MAX_RATE_LIMIT_WAIT_MS));
 			response = await request();
 		}
 		if (!response.ok) throw new Error(`Webhook request failed with status ${response.status}.`);

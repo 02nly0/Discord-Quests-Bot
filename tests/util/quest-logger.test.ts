@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type { LoggingConfig } from '../../src/config';
 import { createQuestLogger, redact } from '../../src/util/quest-logger';
 
-const WEBHOOK_URL = 'your_webhook_url_here if you want to test webhook logging, otherwise leave it empty';
-const CHANNEL_ID = 'your_channel_id_here if you want to test channel logging, otherwise leave it empty';
-const BOT_TOKEN = 'your_bot_token_here if you want to test redaction, otherwise leave it empty';
+const WEBHOOK_URL = 'https://discord.com/api/webhooks/123456789012345678/test-webhook-token';
+const CHANNEL_ID = '123456789012345678';
+const BOT_TOKEN = 'abcDEF_secret-token';
 
 const user = { id: '42', username: 'amtix' };
 const quest = { id: 'quest_123', displayName: 'Call of Duty: Modern Warfare 4' };
@@ -23,11 +23,17 @@ function config(
 let consoleOutput: string[];
 let webhookBodies: string[];
 let channelMessages: unknown[];
+let restoreConsole: () => void;
 
-const okFetch = (async (_url: string, init: RequestInit) => {
+function fakeFetch(handler: (url: string, init: RequestInit) => Response | Promise<Response>): typeof fetch {
+	return (async (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+		handler(String(input), init ?? {})) as typeof fetch;
+}
+
+const okFetch = fakeFetch((_url, init) => {
 	webhookBodies.push(String(init.body));
 	return new Response(null, { status: 204 });
-}) as unknown as typeof fetch;
+});
 
 const resolveChannel = async () => ({
 	send: async (message: unknown) => {
@@ -43,13 +49,14 @@ beforeEach(() => {
 	consoleOutput = [];
 	webhookBodies = [];
 	channelMessages = [];
-	spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+	const spy = spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
 		consoleOutput.push(args.join(' '));
 	});
+	restoreConsole = () => spy.mockRestore();
 });
 
 afterEach(() => {
-	(console.log as unknown as { mockRestore(): void }).mockRestore();
+	restoreConsole();
 });
 
 describe('destinations', () => {
@@ -137,7 +144,7 @@ describe('formatting', () => {
 
 describe('failures', () => {
 	it('keeps the other destinations working when the webhook request fails', async () => {
-		const failingFetch = (async () => new Response(null, { status: 500 })) as unknown as typeof fetch;
+		const failingFetch = fakeFetch(() => new Response(null, { status: 500 }));
 
 		await build({ console: true, webhook: true, channel: true }, { fetch: failingFetch }).record('started', user, quest);
 
@@ -147,9 +154,9 @@ describe('failures', () => {
 	});
 
 	it('survives a rejected network call', async () => {
-		const throwingFetch = (async () => {
+		const throwingFetch = fakeFetch(() => {
 			throw new Error(`connect failed for ${WEBHOOK_URL}`);
-		}) as unknown as typeof fetch;
+		});
 
 		await build({ webhook: true }, { fetch: throwingFetch }).record('started', user, quest);
 
@@ -159,12 +166,12 @@ describe('failures', () => {
 
 	it('retries once after a rate limit', async () => {
 		let calls = 0;
-		const limitedFetch = (async () => {
+		const limitedFetch = fakeFetch(() => {
 			calls += 1;
 			return calls === 1
 				? new Response(null, { status: 429, headers: { 'retry-after': '0' } })
 				: new Response(null, { status: 204 });
-		}) as unknown as typeof fetch;
+		});
 
 		await build({ webhook: true }, { fetch: limitedFetch }).record('started', user, quest);
 
@@ -223,8 +230,7 @@ describe('redaction', () => {
 		const everything = [...consoleOutput, ...webhookBodies, JSON.stringify(channelMessages)].join('\n');
 		expect(everything).toContain('[REDACTED]');
 		expect(everything).not.toContain(BOT_TOKEN);
-		expect(everything).not.toContain('abcDEF_secret-token');
-		expect(everything).not.toContain('MTQxNjk4NzY1NDMyMTA5ODc2NQ');
+		expect(everything).not.toContain(WEBHOOK_URL);
 	});
 
 	it('redacts known secrets and secret shaped text', () => {
