@@ -26,6 +26,7 @@ import {
 	type QuestBatchResult,
 } from '../quest';
 import { log } from '../util/logger';
+import { questLog } from '../util/quest-logger';
 import { describeError } from '../util/format';
 import { ThrottledEditor } from '../util/throttle';
 import {
@@ -182,6 +183,7 @@ async function showDashboardLanguage(interaction: ButtonInteraction, language: L
 }
 
 async function showTokenModal(interaction: ChatInputCommandInteraction | ButtonInteraction): Promise<void> {
+	void questLog.record('command', interaction.user);
 	const tokenInput = new TextInputBuilder()
 		.setCustomId(TOKEN_INPUT_ID)
 		.setLabel('Discord token')
@@ -218,6 +220,7 @@ async function beginQuestSetup(interaction: ModalSubmitInteraction): Promise<voi
 	}
 
 	const setup = setPendingSetup(interaction.user.id, { client, quests, index: 0, showCompleted: false });
+	void questLog.record('viewed', interaction.user);
 	await interaction.editReply(setupView(setup, interaction.user.id));
 }
 
@@ -389,6 +392,8 @@ async function runBatch(
 	let dmMode = false;
 	let refresh: ThrottledEditor | undefined;
 	let dmQueue: Promise<unknown> = Promise.resolve();
+	// Stopping can land between quests, so a cancel is only attributed to a quest that really began.
+	let activeQuest: Quest | undefined;
 
 	try {
 		await interaction.update({
@@ -418,6 +423,8 @@ async function runBatch(
 			signal: controller.signal,
 			hooks: {
 				onQuestStart(quest, index) {
+					activeQuest = quest;
+					void questLog.record('started', user, quest);
 					snapshot.index = index;
 					if (dmMode) return;
 
@@ -437,6 +444,8 @@ async function runBatch(
 					refresh?.request();
 				},
 				onQuestCompleted(quest) {
+					activeQuest = undefined;
+					void questLog.record('completed', user, quest);
 					snapshot.completedCount += 1;
 
 					if (dmMode) {
@@ -450,8 +459,17 @@ async function runBatch(
 
 					refresh?.request();
 				},
+				onQuestFailed(quest, reason) {
+					activeQuest = undefined;
+					void questLog.record('failed', user, quest, reason);
+				},
 			},
 		});
+
+		// A stop that lands after the last quest finished is not a cancellation.
+		if (result.stopped && result.completed.length + result.failed.length < queue.length) {
+			void questLog.record('cancelled', user, activeQuest);
+		}
 
 		const elapsedMs = Date.now() - startedAt;
 

@@ -28,6 +28,26 @@ export function loadFeatures() {
 
 export const features = loadFeatures();
 
+export interface LoggingConfig {
+	/** Master switch. When false, every destination below stays silent. */
+	mode: boolean;
+	console: { enabled: boolean };
+	webhook: { enabled: boolean; url: string };
+	channel: { enabled: boolean; id: string };
+}
+
+/** Quest activity logging. Each destination is switched on and off independently. */
+export function loadLogging(): LoggingConfig {
+	return {
+		mode: envFlag('LOGGING_MODE', true),
+		console: { enabled: envFlag('LOG_CONSOLE_ENABLED', true) },
+		webhook: { enabled: envFlag('LOG_WEBHOOK_ENABLED', false), url: process.env.LOG_WEBHOOK_URL?.trim() ?? '' },
+		channel: { enabled: envFlag('LOG_CHANNEL_ENABLED', false), id: process.env.LOG_CHANNEL_ID?.trim() ?? '' },
+	};
+}
+
+export const logging = loadLogging();
+
 export function loadConfig(): BotConfig {
 	const botToken = process.env.DISCORD_TOKEN;
 	if (!botToken) {
