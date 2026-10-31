@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type { LoggingConfig } from '../../src/config';
 import { createQuestLogger, redact } from '../../src/util/quest-logger';
 
-const WEBHOOK_URL = '';
-const CHANNEL_ID = '123456789012345678';
-const BOT_TOKEN = '';
+const WEBHOOK_URL = 'your_webhook_url_here if you want to test webhook logging, otherwise leave it empty';
+const CHANNEL_ID = 'your_channel_id_here if you want to test channel logging, otherwise leave it empty';
+const BOT_TOKEN = 'your_bot_token_here if you want to test redaction, otherwise leave it empty';
 
 const user = { id: '42', username: 'amtix' };
 const quest = { id: 'quest_123', displayName: 'Call of Duty: Modern Warfare 4' };
